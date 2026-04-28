@@ -539,6 +539,11 @@
     margin-bottom: 14px;
   }
 
+  .desktop-grid.two-col,
+  .desktop-grid.three-col {
+    align-items: start;
+  }
+
   .chart-card {
     min-height: 220px;
     display: flex;
@@ -1071,6 +1076,19 @@
     .dashboard-grid {
       grid-template-columns: minmax(340px, 0.9fr) minmax(420px, 1.1fr);
       align-items: start;
+    }
+
+    .home-layout {
+      grid-template-columns: minmax(360px, 0.85fr) minmax(420px, 1.15fr);
+      align-items: stretch;
+    }
+
+    .desktop-grid.two-col {
+      grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);
+    }
+
+    .desktop-grid.three-col {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .pipeline-grid,

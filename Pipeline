@@ -54,8 +54,9 @@
       <div class="card-mewah funnel-card">
         <div class="funnel-box st-apk"><span>APK Masuk</span><span id="fn-naik">0</span></div>
         <div class="funnel-box st-app"><span>Approve</span><span id="fn-app">0</span></div>
-        <div class="funnel-box st-cair"><span>Cair / Liquid</span><span id="fn-cair">0</span></div>
+        <div class="funnel-box st-pen"><span>Pending</span><span id="fn-pen">0</span></div>
         <div class="funnel-box st-rej"><span>Reject</span><span id="fn-rej">0</span></div>
+        <div class="funnel-box st-cair"><span>Cair</span><span id="fn-cair">0</span></div>
       </div>
     </div>
 

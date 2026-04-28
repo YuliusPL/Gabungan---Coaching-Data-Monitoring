@@ -316,7 +316,7 @@
 
   function calculatePipeline() {
     const rows = pipeFiltered;
-    const metrics = { apk: 0, app: 0, rej: 0, cair: 0, pla: 0, ag: [0, 0, 0, 0] };
+    const metrics = { apk: 0, app: 0, pen: 0, rej: 0, cair: 0, pla: 0, ag: [0, 0, 0, 0] };
     const salesPerf = {};
     const productMix = {};
     const today = new Date().getTime();
@@ -330,6 +330,7 @@
       const mixVal = String(r[4] || 'LAINNYA').toUpperCase();
 
       if (kp.includes('APPROVE')) metrics.app++;
+      if (kp.includes('PENDING') || st.includes('PENDING')) metrics.pen++;
       if (kp.includes('REJECT')) metrics.rej++;
       if (st === 'CAIR') metrics.cair++;
 
@@ -353,8 +354,9 @@
 
     setText('fn-naik', metrics.apk.toLocaleString('id-ID'));
     setText('fn-app', metrics.app.toLocaleString('id-ID'));
-    setText('fn-cair', metrics.cair.toLocaleString('id-ID'));
+    setText('fn-pen', metrics.pen.toLocaleString('id-ID'));
     setText('fn-rej', metrics.rej.toLocaleString('id-ID'));
+    setText('fn-cair', metrics.cair.toLocaleString('id-ID'));
 
     [1, 2, 3, 4].forEach(i => {
       setText('ag-' + i, metrics.ag[i - 1].toLocaleString('id-ID'));
@@ -461,7 +463,11 @@
 
     pageOrder.forEach(page => {
       const panel = document.getElementById('panel-' + page);
-      if (panel) panel.style.display = page === currentPage ? 'block' : 'none';
+      if (panel) {
+        const isActive = page === currentPage;
+        panel.style.display = isActive ? 'block' : 'none';
+        panel.classList.toggle('active', isActive);
+      }
     });
 
     updateHeaderSubtitle();
