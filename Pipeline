@@ -1,0 +1,40 @@
+<div id="v-pipe" style="display:none">
+  <div class="card-mewah mb-2 shadow-sm" style="border-top: 4px solid var(--primary);">
+    <div class="row g-1">
+      <div class="col-6"><input type="date" id="p-start" class="form-control form-control-sm" onchange="filterPipe()"></div>
+      <div class="col-6"><input type="date" id="p-end" class="form-control form-control-sm" onchange="filterPipe()"></div>
+      <div class="col-6 mt-1"><select id="p-c" class="form-select form-select-sm" onchange="syncSalesByBranch()"></select></div>
+      <div class="col-6 mt-1"><select id="p-s" class="form-select form-select-sm" onchange="filterPipe()"></select></div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6"><div class="card-mewah p-3"><div class="card-content-fix"><span class="p-title">APPROVAL RATE</span><b class="p-val" id="k-conv" style="color:var(--app-blue)">0%</b></div></div></div>
+    <div class="col-6"><div class="card-mewah p-3"><div class="card-content-fix"><span class="p-title">AVG TICKET SIZE</span><b class="p-val" id="k-avg">Rp 0</b></div></div></div>
+    <div class="col-12"><div class="card-mewah p-3 hero-stat text-center"><div class="d-flex justify-content-center align-items-center"><span class="p-title text-white opacity-75 me-3">ESTIMASI PLAFOND PIPELINE</span><b class="p-val text-white" id="k-pla" style="font-size:22px !important;">Rp 0</b></div></div></div>
+  </div>
+
+  <h6 class="fw-bold mb-2 small text-muted px-2">FUNNEL PIPELINE</h6>
+  <div class="card-mewah mb-3">
+    <div class="funnel-box st-apk"><span>APK MASUK</span><span id="fn-naik">0</span></div>
+    <div class="funnel-box st-app"><span>APPROVE</span><span id="fn-app">0</span></div>
+    <div class="funnel-box st-cair"><span>CAIR (LIQUID)</span><span id="fn-cair">0</span></div>
+    <div class="funnel-box st-rej"><span>REJECT</span><span id="fn-rej">0</span></div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-md-6"><h6 class="fw-bold mb-2 small text-muted px-2">PRODUCT MIX (PORTFOLIO)</h6><div class="card-mewah d-flex justify-content-center align-items-center" style="min-height:180px;"><canvas id="pChartMix"></canvas></div></div>
+    <div class="col-md-6"><h6 class="fw-bold mb-2 small text-muted px-2">AGING PIPELINE</h6><div class="card-mewah p-0 overflow-hidden"><div class="rank-row"><span>0–3 Hari</span><b id="ag-1">0</b></div><div class="rank-row"><span>4–7 Hari</span><b id="ag-2" style="color:var(--pen-orange)">0</b></div><div class="rank-row"><span>7–14 Hari</span><b id="ag-3" style="color:var(--rej-red)">0</b></div><div class="rank-row" style="border:none;"><span>> 14 Hari</span><b id="ag-4" class="text-danger fw-bold">0</b></div></div></div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6"><h6 class="fw-bold mb-2 small text-muted px-2">TOP 10 SALES</h6><div class="card-mewah p-0 overflow-hidden" id="top-sales-list"></div></div>
+    <div class="col-6"><h6 class="fw-bold mb-2 small text-muted px-2 text-danger">BOT 10 SALES</h6><div class="card-mewah p-0 overflow-hidden" id="bot-sales-list"></div></div>
+  </div>
+
+  <div class="card-mewah p-0 overflow-hidden shadow-sm">
+    <div class="p-2 border-bottom bg-light d-flex justify-content-between align-items-center"><span class="fw-bold small">DETAIL DATA PIPELINE</span><input type="text" id="p-search" class="form-control form-control-sm w-50" placeholder="Cari..." onkeyup="debounceSearch()"></div>
+    <div style="max-height:450px; overflow-y:auto"><table class="table table-sm table-hover mb-0" style="font-size:9px;"><thead><tr class="bg-dark text-white"><th>DEBITUR</th><th>SALES</th><th>STATUS</th><th>KEPUTUSAN</th><th>PLAFOND</th></tr></thead><tbody id="pipe-body"></tbody></table></div>
+    <div class="p-2 bg-light text-center border-top"><div id="p-info" style="font-size:9px;">0 Data Terfilter</div></div>
+  </div>
+</div>
