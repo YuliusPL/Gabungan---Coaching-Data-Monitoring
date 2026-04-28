@@ -1,217 +1,783 @@
 <script>
-  let db = { achv:[], cair:[], pipeline:[], listCHome:[], listCPipe:[], listS:[] }, chartMix = null;
-  let dbCoaching = { master: [], coaching: [], progress: [] }; 
-  let pipeFiltered = [], rowLimit = 25, searchTimeout = null;
-  let currentSort = { col: null, asc: true };
+  let db = { u: {}, achv: [], cair: [], pipeline: [], listCHome: [], listCPipe: [], listS: [] };
+  let dbCoaching = { master: [], coaching: [], progress: [] };
+  let chartMix = null;
+  let pipeFiltered = [];
+  let rowLimit = 25;
+  let searchTimeout = null;
+  let currentSort = { col: 'nama', asc: true };
+  let currentPage = 'home';
+
+  const pageOrder = ['home', 'pipe', 'coaching', 'admin'];
+  const pageIndexMap = { home: 0, pipe: 1, coaching: 2, admin: 3 };
+  const storageKey = 'cc_modular_v2';
 
   function initApp() {
-    const stored = sessionStorage.getItem('cc_modular_v1');
-    if (stored) { 
-      db = JSON.parse(stored); 
-      renderUI(); 
-      document.getElementById('loader-global').style.display='none'; 
-      fetchCoachingAddon(); 
-    } else { 
-      fetchDB(); 
+    setDefaultDates();
+    setupSwipeNavigation();
+
+    const stored = sessionStorage.getItem(storageKey);
+    if (stored) {
+      try {
+        db = JSON.parse(stored);
+        renderUI();
+        hideLoader();
+        fetchCoachingAddon();
+        switchPage('home', true);
+        return;
+      } catch (e) {
+        sessionStorage.removeItem(storageKey);
+      }
     }
+
+    fetchDB();
+  }
+
+  function setDefaultDates() {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const fmt = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    ['f-start', 'p-start'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el.value) el.value = fmt(firstDay);
+    });
+
+    ['f-end', 'p-end', 'u-t'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el.value) el.value = fmt(today);
+    });
+  }
+
+  function hideLoader() {
+    const loader = document.getElementById('loader-global');
+    if (loader) loader.style.display = 'none';
   }
 
   function fetchDB() {
-    google.script.run.withSuccessHandler(res => { 
-      db = res; sessionStorage.setItem('cc_modular_v1', JSON.stringify(res)); 
-      renderUI(); 
-      document.getElementById('loader-global').style.display='none'; 
-      fetchCoachingAddon();
-    }).getDashboardData();
+    google.script.run
+      .withSuccessHandler(res => {
+        db = res || db;
+        sessionStorage.setItem(storageKey, JSON.stringify(db));
+        renderUI();
+        hideLoader();
+        fetchCoachingAddon();
+        switchPage(currentPage, true);
+      })
+      .withFailureHandler(err => {
+        hideLoader();
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal memuat dashboard', 'error');
+      })
+      .getDashboardData();
   }
 
   function renderUI() {
-    document.getElementById('u-nama').innerText = db.u.nama;
-    const fill = (id, list, txt) => { 
-      const s = document.getElementById(id); if(!s) return; 
-      s.innerHTML = `<option value="">${txt}</option>`; 
-      [...new Set(list)].sort().forEach(v => s.add(new Option(v, v))); 
-    };
-    fill('f-c', db.listCHome, "Pilih Cabang"); 
-    fill('p-c', db.listCPipe, "Semua Cabang"); 
+    const nameEl = document.getElementById('u-nama');
+    if (nameEl && db.u && db.u.nama) nameEl.innerText = db.u.nama;
+
+    const isAdmin = !db.u || !db.u.role || String(db.u.role).toLowerCase() === 'admin';
+    const adminNav = document.getElementById('n-admin');
+    const adminQuick = document.getElementById('quick-admin-btn');
+    if (adminNav) adminNav.style.display = isAdmin ? 'flex' : 'none';
+    if (adminQuick) adminQuick.style.display = isAdmin ? 'inline-flex' : 'none';
+
+    fillSelect('f-c', db.listCHome, 'Semua Cabang');
+    fillSelect('p-c', db.listCPipe, 'Semua Cabang');
     syncSalesByBranch();
     runFilter(true);
   }
 
+  function fillSelect(id, list, placeholder) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>`;
+    [...new Set((list || []).filter(Boolean))].sort().forEach(v => {
+      el.add(new Option(v, v));
+    });
+  }
+
   function syncSalesByBranch() {
-    const cab = document.getElementById('p-c'); if(!cab) return;
+    const cab = document.getElementById('p-c');
     const salesSelect = document.getElementById('p-s');
-    const filteredSales = [...new Set(db.pipeline.filter(x => cab.value==="" || x[8]===cab.value).map(x => x[6]))].sort();
+    if (!cab || !salesSelect) return;
+
+    const filteredSales = [...new Set(
+      (db.pipeline || [])
+        .filter(x => cab.value === '' || x[8] === cab.value)
+        .map(x => x[6])
+        .filter(Boolean)
+    )].sort();
+
     salesSelect.innerHTML = '<option value="">Semua Sales</option>';
     filteredSales.forEach(s => salesSelect.add(new Option(s, s)));
     filterPipe();
   }
 
-  function runFilter(isBC = false) {
-    const s = document.getElementById('f-start').value || "1900-01-01", e = document.getElementById('f-end').value || "2100-12-31", c = document.getElementById('f-c').value, n = document.getElementById('f-n').value;
-    if (isBC) {
-      const sSel = document.getElementById('f-n'); if(sSel) {
-        sSel.innerHTML = '<option value="">Semua Staff</option>';
-        db.achv.filter(r => c==="" || r[1]===c).map(r => r[2]).filter((v,i,a) => a.indexOf(v)===i).sort().forEach(st => sSel.add(new Option(st, st)));
+  function runFilter(isBranchChange = false) {
+    const s = getValue('f-start') || '1900-01-01';
+    const e = getValue('f-end') || '2100-12-31';
+    const c = getValue('f-c');
+    const n = getValue('f-n');
+
+    if (isBranchChange) {
+      const staffSelect = document.getElementById('f-n');
+      if (staffSelect) {
+        staffSelect.innerHTML = '<option value="">Semua Staff</option>';
+        [...new Set(
+          (db.achv || [])
+            .filter(r => (c === '' || r[1] === c) && r[3] !== 'tele')
+            .map(r => r[2])
+            .filter(Boolean)
+        )].sort().forEach(st => staffSelect.add(new Option(st, st)));
       }
     }
-    const getLatest = (src) => {
-      let u = {}; src.forEach(r => { if(r[0]>=s && r[0]<=e && (c===""||r[1]===c) && (n===""||r[2]===n)) { let k=r[1]+r[2]+(r[3]||""); if(!u[k]||r[0]>u[k][0]) u[k]=r; } });
-      return Object.values(u);
+
+    const latestAchv = getLatestAchievementData(db.achv || [], s, e, c, n);
+    const filteredCair = (db.cair || []).filter(r =>
+      r[0] >= s &&
+      r[0] <= e &&
+      (c === '' || r[1] === c) &&
+      (n === '' || r[2] === n)
+    );
+
+    const resA = {
+      global: { r: 0, t: 0 },
+      cs: { r: 0, t: 0 },
+      spv: { r: 0, t: 0 },
+      tele: { r: 0, t: 0 }
     };
-    const fA = getLatest(db.achv), fC = getLatest(db.cair);
-    let resA = { global:{r:0,t:0}, cs:{r:0,t:0}, spv:{r:0,t:0}, tele:{r:0,t:0} };
-    fA.forEach(r => { resA.global.r += r[5]; resA.global.t += r[4]; if(resA[r[3]]) { resA[r[3]].r += r[5]; resA[r[3]].t += r[4]; } });
-    document.getElementById('g-r').innerText = "Rp " + resA.global.r.toLocaleString('id-ID');
-    document.getElementById('g-t').innerText = "Rp " + resA.global.t.toLocaleString('id-ID');
-    let pG = resA.global.t > 0 ? (resA.global.r / resA.global.t * 100).toFixed(1) : 0;
-    document.getElementById('g-p').innerText = pG + "%";
-    ['cs','spv','tele'].forEach(k => {
-      let p = resA[k].t > 0 ? (resA[k].r / resA[k].t * 100).toFixed(1) : 0;
-      const elP = document.getElementById(k+'-p'); if(elP) elP.innerText = p + "%";
-      const elT = document.getElementById(k+'-tgt'); if(elT) elT.innerText = "Rp " + resA[k].t.toLocaleString('id-ID');
-      const elA = document.getElementById(k+'-ach'); if(elA) elA.innerText = "Rp " + resA[k].r.toLocaleString('id-ID');
+
+    latestAchv.forEach(r => {
+      resA.global.r += Number(r[5]) || 0;
+      resA.global.t += Number(r[4]) || 0;
+      if (resA[r[3]]) {
+        resA[r[3]].r += Number(r[5]) || 0;
+        resA[r[3]].t += Number(r[4]) || 0;
+      }
     });
-    let resC = {}, gI = 0; fC.forEach(r => { if(!resC[r[3]]) resC[r[3]] = { q:0, v:0 }; resC[r[3]].q += r[4]; resC[r[3]].v += r[5]; gI += r[4]; });
-    let h = ""; Object.keys(resC).sort().forEach(p => { h += `<div class="cair-row"><div><b>${p}</b><br><small>${resC[p].q} Item</small></div><div class="text-end"><span class="text-primary fw-bold">Rp ${resC[p].v.toLocaleString('id-ID')}</span></div></div>`; });
-    h += `<div class="cair-row total-row"><div><b>GRAND TOTAL REALISASI</b><br><small>${gI.toLocaleString('id-ID')} Item</small></div><div class="text-end"><span class="total-val-gagah">Rp ${resA.global.r.toLocaleString('id-ID')}</span></div></div>`;
-    document.getElementById('cair-list').innerHTML = h || "<p class='text-center py-5 small text-muted'>Kosong</p>";
-    const ctx = document.getElementById('gChart').getContext('2d'); if(window.myChart) window.myChart.destroy();
-    window.myChart = new Chart(ctx, { type:'doughnut', data:{ datasets:[{ data:[pG, 100-pG], backgroundColor:['#00A8E8','rgba(255,255,255,0.1)'], borderWidth:0, cutout:'80%', circumference:240, rotation:240 }] }, options:{ plugins:{ tooltip:{enabled:false} } } });
+
+    setText('g-r', 'Rp ' + resA.global.r.toLocaleString('id-ID'));
+    setText('g-t', 'Rp ' + resA.global.t.toLocaleString('id-ID'));
+
+    const pG = resA.global.t > 0 ? ((resA.global.r / resA.global.t) * 100).toFixed(1) : '0.0';
+    setText('g-p', pG + '%');
+
+    ['cs', 'spv', 'tele'].forEach(k => {
+      const p = resA[k].t > 0 ? ((resA[k].r / resA[k].t) * 100).toFixed(1) : '0.0';
+      setText(k + '-p', p + '%');
+      setText(k + '-tgt', 'Rp ' + resA[k].t.toLocaleString('id-ID'));
+      setText(k + '-ach', 'Rp ' + resA[k].r.toLocaleString('id-ID'));
+    });
+
+    const resC = {};
+    let grandItem = 0;
+    let grandValue = 0;
+
+    filteredCair.forEach(r => {
+      const prod = r[3] || 'LAINNYA';
+      if (!resC[prod]) resC[prod] = { q: 0, v: 0 };
+      resC[prod].q += Number(r[4]) || 0;
+      resC[prod].v += Number(r[5]) || 0;
+      grandItem += Number(r[4]) || 0;
+      grandValue += Number(r[5]) || 0;
+    });
+
+    let h = '';
+    Object.keys(resC).sort().forEach(p => {
+      h += `
+        <div class="cair-row">
+          <div>
+            <b>${escapeHtml(p)}</b><br>
+            <small>${resC[p].q.toLocaleString('id-ID')} Item</small>
+          </div>
+          <div class="text-end">
+            <span class="text-primary fw-bold">Rp ${resC[p].v.toLocaleString('id-ID')}</span>
+          </div>
+        </div>
+      `;
+    });
+
+    h += `
+      <div class="cair-row total-row">
+        <div>
+          <b>GRAND TOTAL PENCAIRAN</b><br>
+          <small>${grandItem.toLocaleString('id-ID')} Item</small>
+        </div>
+        <div class="text-end">
+          <span class="total-val-gagah">Rp ${grandValue.toLocaleString('id-ID')}</span>
+        </div>
+      </div>
+    `;
+
+    const cairList = document.getElementById('cair-list');
+    if (cairList) cairList.innerHTML = h || "<p class='text-center py-5 small text-muted'>Kosong</p>";
+    renderHomeChart(Number(pG));
+  }
+
+  function getLatestAchievementData(src, startDate, endDate, cabang, staff) {
+    const latestMap = {};
+    src.forEach(r => {
+      const valid =
+        r[0] >= startDate &&
+        r[0] <= endDate &&
+        (cabang === '' || r[1] === cabang) &&
+        (staff === '' || r[2] === staff);
+
+      if (!valid) return;
+
+      const key = `${r[1]}__${r[2]}__${r[3] || ''}`;
+      if (!latestMap[key] || r[0] > latestMap[key][0]) {
+        latestMap[key] = r;
+      }
+    });
+
+    return Object.values(latestMap);
+  }
+
+  function renderHomeChart(percent) {
+    const canvas = document.getElementById('gChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (window.myChart) window.myChart.destroy();
+
+    const p = Math.max(0, Math.min(100, Number(percent) || 0));
+    window.myChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [p, 100 - p],
+          backgroundColor: ['#4cb0ff', 'rgba(255,255,255,0.16)'],
+          borderWidth: 0,
+          cutout: '80%',
+          circumference: 240,
+          rotation: 240
+        }]
+      },
+      options: { plugins: { tooltip: { enabled: false } } }
+    });
   }
 
   function filterPipe() {
-    const sD = document.getElementById('p-start').value || "1900-01-01", eD = document.getElementById('p-end').value || "2100-12-31", c = document.getElementById('p-c').value, sal = document.getElementById('p-s').value;
-    pipeFiltered = db.pipeline.filter(x => x[0]>=sD && x[0]<=eD && (c==="" || x[8]===c) && (sal==="" || x[6]===sal));
+    const sD = getValue('p-start') || '1900-01-01';
+    const eD = getValue('p-end') || '2100-12-31';
+    const c = getValue('p-c');
+    const sal = getValue('p-s');
+
+    pipeFiltered = (db.pipeline || []).filter(x =>
+      x[0] >= sD &&
+      x[0] <= eD &&
+      (c === '' || x[8] === c) &&
+      (sal === '' || x[6] === sal)
+    );
+
+    filterTablePipe();
     calculatePipeline();
   }
 
-  function calculatePipeline() {
-    let m = { apk:0, app:0, rej:0, cair:0, pla:0, ag:[0,0,0,0] };
-    let sPerf = {}, pMix = {}, today = new Date().getTime();
-    pipeFiltered.forEach(r => {
-      m.apk++; m.pla += r[7];
-      const st = r[3].toUpperCase(), kp = r[5].toUpperCase(), mixVal = r[4].toUpperCase();
-      if(kp.includes('APPROVE')) m.app++;
-      if(kp.includes('REJECT')) m.rej++;
-      if(st === 'CAIR') m.cair++;
-      pMix[mixVal] = (pMix[mixVal] || 0) + 1;
-      const diff = Math.floor((today - r[1]) / 86400000);
-      if(diff <= 3) m.ag[0]++; else if(diff <= 7) m.ag[1]++; else if(diff <= 14) m.ag[2]++; else m.ag[3]++;
-      if(!sPerf[r[6]]) sPerf[r[6]] = { p:0, a:0 }; sPerf[r[6]].p += r[7]; sPerf[r[6]].a++;
+  function filterTablePipe() {
+    const keyword = (getValue('p-search') || '').toLowerCase().trim();
+    if (!keyword) {
+      renderTablePipe(pipeFiltered);
+      return;
+    }
+
+    const filtered = pipeFiltered.filter(r => {
+      return [r[2], r[3], r[4], r[5], r[6], r[8]]
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword);
     });
-    document.getElementById('k-pla').innerText = "Rp " + m.pla.toLocaleString('id-ID');
-    document.getElementById('k-conv').innerText = (m.apk > 0 ? (m.app/m.apk*100).toFixed(1) : 0) + "%";
-    document.getElementById('k-avg').innerText = "Rp " + (m.apk > 0 ? Math.round(m.pla/m.apk).toLocaleString('id-ID') : 0);
-    document.getElementById('fn-naik').innerText = m.apk; document.getElementById('fn-app').innerText = m.app;
-    document.getElementById('fn-cair').innerText = m.cair; document.getElementById('fn-rej').innerText = m.rej;
-    [1,2,3,4].forEach(i => document.getElementById('ag-'+i).innerText = m.ag[i-1]);
-    const sorted = Object.entries(sPerf).sort((a,b) => b[1].p - a[1].p);
-    let tH = ""; sorted.slice(0,10).forEach((item, i) => { tH += `<div class='rank-row'><span>${i+1}. ${item[0]}</span><b>Rp ${item[1].p.toLocaleString('id-ID')}</b></div>`; });
-    let bH = ""; sorted.slice(-10).reverse().forEach((item, i) => { bH += `<div class='rank-row bottom-alert'><span>${i+1}. ${item[0]}</span><b>${item[1].a} Apk</b></div>`; });
-    document.getElementById('top-sales-list').innerHTML = tH || "-"; document.getElementById('bot-sales-list').innerHTML = bH || "-";
-    const ctxM = document.getElementById('pChartMix').getContext('2d'); if(chartMix) chartMix.destroy();
-    chartMix = new Chart(ctxM, { type:'doughnut', data:{ labels:Object.keys(pMix), datasets:[{ data:Object.values(pMix), backgroundColor:['#002D57','#00A8E8','#198754','#DC3545','#FFC107','#FD7E14'], borderWidth:0 }] }, options:{ plugins:{ legend:{position:'bottom', labels:{boxWidth:10, font:{size:10}}} }, cutout:'60%' } });
-    renderTablePipe(pipeFiltered);
+
+    renderTablePipe(filtered);
+  }
+
+  function calculatePipeline() {
+    const rows = pipeFiltered;
+    const metrics = { apk: 0, app: 0, rej: 0, cair: 0, pla: 0, ag: [0, 0, 0, 0] };
+    const salesPerf = {};
+    const productMix = {};
+    const today = new Date().getTime();
+
+    rows.forEach(r => {
+      metrics.apk++;
+      metrics.pla += Number(r[7]) || 0;
+
+      const st = String(r[3] || '').toUpperCase();
+      const kp = String(r[5] || '').toUpperCase();
+      const mixVal = String(r[4] || 'LAINNYA').toUpperCase();
+
+      if (kp.includes('APPROVE')) metrics.app++;
+      if (kp.includes('REJECT')) metrics.rej++;
+      if (st === 'CAIR') metrics.cair++;
+
+      productMix[mixVal] = (productMix[mixVal] || 0) + 1;
+
+      const diff = Math.floor((today - (Number(r[1]) || today)) / 86400000);
+      if (diff <= 3) metrics.ag[0]++;
+      else if (diff <= 7) metrics.ag[1]++;
+      else if (diff <= 14) metrics.ag[2]++;
+      else metrics.ag[3]++;
+
+      const sales = r[6] || '-';
+      if (!salesPerf[sales]) salesPerf[sales] = { p: 0, a: 0 };
+      salesPerf[sales].p += Number(r[7]) || 0;
+      salesPerf[sales].a++;
+    });
+
+    setText('k-pla', 'Rp ' + metrics.pla.toLocaleString('id-ID'));
+    setText('k-conv', (metrics.apk > 0 ? ((metrics.app / metrics.apk) * 100).toFixed(1) : '0.0') + '%');
+    setText('k-avg', 'Rp ' + (metrics.apk > 0 ? Math.round(metrics.pla / metrics.apk).toLocaleString('id-ID') : '0'));
+
+    setText('fn-naik', metrics.apk.toLocaleString('id-ID'));
+    setText('fn-app', metrics.app.toLocaleString('id-ID'));
+    setText('fn-cair', metrics.cair.toLocaleString('id-ID'));
+    setText('fn-rej', metrics.rej.toLocaleString('id-ID'));
+
+    [1, 2, 3, 4].forEach(i => {
+      setText('ag-' + i, metrics.ag[i - 1].toLocaleString('id-ID'));
+    });
+
+    const sorted = Object.entries(salesPerf).sort((a, b) => b[1].p - a[1].p);
+    let topHtml = '';
+    sorted.slice(0, 10).forEach((item, i) => {
+      topHtml += `<div class="rank-row"><span>${i + 1}. ${escapeHtml(item[0])}</span><b>Rp ${item[1].p.toLocaleString('id-ID')}</b></div>`;
+    });
+
+    let botHtml = '';
+    [...sorted].sort((a, b) => a[1].p - b[1].p).slice(0, 10).forEach((item, i) => {
+      botHtml += `<div class="rank-row bottom-alert"><span>${i + 1}. ${escapeHtml(item[0])}</span><b>${item[1].a} Apk</b></div>`;
+    });
+
+    const top = document.getElementById('top-sales-list');
+    const bot = document.getElementById('bot-sales-list');
+    if (top) top.innerHTML = topHtml || '<div class="empty-state">Belum ada data</div>';
+    if (bot) bot.innerHTML = botHtml || '<div class="empty-state">Belum ada data</div>';
+
+    renderPipelineMixChart(productMix);
+  }
+
+  function renderPipelineMixChart(productMix) {
+    const canvas = document.getElementById('pChartMix');
+    if (!canvas) return;
+
+    const labels = Object.keys(productMix);
+    const values = Object.values(productMix);
+    const ctx = canvas.getContext('2d');
+
+    if (chartMix) chartMix.destroy();
+
+    chartMix = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels.length ? labels : ['Belum Ada Data'],
+        datasets: [{
+          data: values.length ? values : [1],
+          backgroundColor: labels.length
+            ? ['#0f3d75', '#0f8c95', '#7a4ff3', '#de7a16', '#1c8d54', '#dc3545', '#ffc658']
+            : ['#CBD5E1'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 10, font: { size: 10 } }
+          }
+        },
+        cutout: '64%'
+      }
+    });
   }
 
   function renderTablePipe(data) {
-    let h = ""; data.slice(0, rowLimit).forEach(r => {
-      let sc = r[3].toUpperCase().includes('APK') ? "st-apk" : (r[3].toUpperCase()==='CAIR' ? "st-cair" : "st-app");
-      let kc = r[5].toUpperCase().includes('REJECT') ? "st-rej" : (r[5].toUpperCase().includes('APPROVE') ? "st-app" : "st-apk");
-      h += `<tr><td><b>${r[2]}</b></td><td><small>${r[6]}</small></td><td><span class="badge-status ${sc}">${r[3]}</span></td><td><span class="badge-status ${kc}">${r[5] || "-"}</span></td><td class="fw-bold">Rp ${r[7].toLocaleString('id-ID')}</td></tr>`;
+    let h = '';
+    data.slice(0, rowLimit).forEach(r => {
+      const status = String(r[3] || '');
+      const keputusan = String(r[5] || '');
+      const sc = status.toUpperCase().includes('APK')
+        ? 'st-apk'
+        : (status.toUpperCase() === 'CAIR' ? 'st-cair' : 'st-app');
+      const kc = keputusan.toUpperCase().includes('REJECT')
+        ? 'st-rej'
+        : (keputusan.toUpperCase().includes('APPROVE') ? 'st-app' : 'st-apk');
+
+      h += `
+        <tr>
+          <td><b>${escapeHtml(r[2] || '-')}</b></td>
+          <td><small>${escapeHtml(r[6] || '-')}</small></td>
+          <td><span class="badge-status ${sc}">${escapeHtml(status || '-')}</span></td>
+          <td><span class="badge-status ${kc}">${escapeHtml(keputusan || '-')}</span></td>
+          <td class="fw-bold">Rp ${(Number(r[7]) || 0).toLocaleString('id-ID')}</td>
+        </tr>
+      `;
     });
-    document.getElementById('pipe-body').innerHTML = h || "<tr><td colspan='5' class='text-center p-4'>Kosong</td></tr>";
-    document.getElementById('p-info').innerText = `${data.length} Data Terfilter`;
+
+    const body = document.getElementById('pipe-body');
+    if (body) body.innerHTML = h || "<tr><td colspan='5' class='text-center p-4'>Kosong</td></tr>";
+    setText('p-info', `${data.length} Data Terfilter`);
   }
 
-  function switchPage(p) {
-    ['v-home','v-pipe','v-coaching','v-admin'].forEach(v => { const el = document.getElementById(v); if(el) el.style.display = 'none'; });
-    ['n-h','n-p','n-c','n-a'].forEach(n => { const el = document.getElementById(n); if(el) el.classList.remove('active'); });
-    const target = document.getElementById('v-'+p); if(target) target.style.display = 'block';
-    const nav = document.getElementById('n-'+p.charAt(0)); if(nav) nav.classList.add('active');
+  function switchPage(page, forceMove = false) {
+    currentPage = pageIndexMap[page] === undefined ? 'home' : page;
+    updatePageTransform(forceMove);
+    updateActiveNavigation(currentPage);
   }
 
-  function refreshData() { sessionStorage.removeItem('cc_modular_v1'); fetchDB(); }
+  function updatePageTransform() {
+    const track = document.getElementById('page-track');
+    if (!track) return;
 
-  /* --- ADD-ON LOGIC: COACHING INTERACTIVE TABLE --- */
+    const idx = pageIndexMap[currentPage] || 0;
+    track.style.transition = 'transform 0.32s cubic-bezier(.2,.8,.2,1)';
+    track.style.transform = `translateX(-${idx * 100}vw)`;
+    updateHeaderSubtitle();
+  }
+
+  function updateActiveNavigation(page) {
+    const navMap = {
+      home: 'n-home',
+      pipe: 'n-pipe',
+      coaching: 'n-coaching',
+      admin: 'n-admin'
+    };
+
+    Object.values(navMap).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('active');
+    });
+
+    document.querySelectorAll('.quick-tab').forEach(el => el.classList.remove('active'));
+
+    const nav = document.getElementById(navMap[page]);
+    if (nav) nav.classList.add('active');
+
+    const quickMap = {
+      home: '.quick-home',
+      pipe: '.quick-pipe',
+      coaching: '.quick-coaching',
+      admin: '.quick-admin'
+    };
+
+    const quick = document.querySelector(quickMap[page]);
+    if (quick) quick.classList.add('active');
+  }
+
+  function updateHeaderSubtitle() {
+    const map = {
+      home: 'Ringkasan performa, achievement, dan pencairan',
+      pipe: 'Monitoring funnel, aging, dan kualitas pipeline',
+      coaching: 'Pendampingan staff dan tindak lanjut coaching',
+      admin: 'Pusat unggah data dan kontrol pembaruan dashboard'
+    };
+
+    setText('header-subtitle', map[currentPage] || '');
+  }
+
+  function setupSwipeNavigation() {
+    const container = document.getElementById('page-container');
+    const track = document.getElementById('page-track');
+    if (!container || !track) return;
+
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let isDragging = false;
+    let isHorizontal = false;
+
+    container.addEventListener('touchstart', (e) => {
+      if (!e.touches || !e.touches.length) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      currentX = startX;
+      isDragging = true;
+      isHorizontal = false;
+      track.style.transition = 'none';
+    }, { passive: true });
+
+    container.addEventListener('touchmove', (e) => {
+      if (!isDragging || !e.touches || !e.touches.length) return;
+
+      currentX = e.touches[0].clientX;
+      const currentY = e.touches[0].clientY;
+      const diffX = currentX - startX;
+      const diffY = currentY - startY;
+
+      if (!isHorizontal) {
+        if (Math.abs(diffX) > 10 && Math.abs(diffX) > Math.abs(diffY)) {
+          isHorizontal = true;
+        } else if (Math.abs(diffY) > Math.abs(diffX)) {
+          return;
+        }
+      }
+
+      if (!isHorizontal) return;
+
+      const currentIndex = pageIndexMap[currentPage] || 0;
+      const base = -currentIndex * window.innerWidth;
+      track.style.transform = `translateX(${base + diffX}px)`;
+    }, { passive: true });
+
+    container.addEventListener('touchend', () => {
+      if (!isDragging) return;
+
+      const diffX = currentX - startX;
+      const threshold = 60;
+      const currentIndex = pageIndexMap[currentPage] || 0;
+
+      if (Math.abs(diffX) > threshold) {
+        if (diffX < 0 && currentIndex < pageOrder.length - 1) {
+          currentPage = pageOrder[currentIndex + 1];
+        } else if (diffX > 0 && currentIndex > 0) {
+          currentPage = pageOrder[currentIndex - 1];
+        }
+      }
+
+      updatePageTransform(true);
+      updateActiveNavigation(currentPage);
+      isDragging = false;
+      isHorizontal = false;
+    }, { passive: true });
+  }
+
+  function refreshData() {
+    sessionStorage.removeItem(storageKey);
+    const loader = document.getElementById('loader-global');
+    if (loader) loader.style.display = 'flex';
+    fetchDB();
+  }
+
+  function execU() {
+    const dateVal = getValue('u-t');
+    const tipe = getValue('u-j');
+    const fileInput = document.getElementById('u-f');
+    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+
+    if (!dateVal) {
+      Swal.fire('Error', 'Tanggal data wajib diisi.', 'error');
+      return;
+    }
+
+    if (!file) {
+      Swal.fire('Error', 'Pilih file Excel terlebih dahulu.', 'error');
+      return;
+    }
+
+    Swal.fire({
+      title: 'Memproses file...',
+      text: 'Mohon tunggu sebentar',
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+
+        google.script.run
+          .withSuccessHandler(msg => {
+            Swal.fire('Selesai', msg || 'Upload berhasil', 'success');
+            fileInput.value = '';
+            refreshData();
+          })
+          .withFailureHandler(err => {
+            Swal.fire('Error', err && err.message ? err.message : 'Upload gagal', 'error');
+          })
+          .processExcelData(rows, dateVal, tipe);
+      } catch (err) {
+        Swal.fire('Error', err.message || 'Gagal membaca file', 'error');
+      }
+    };
+
+    reader.onerror = function() {
+      Swal.fire('Error', 'Gagal membaca file lokal.', 'error');
+    };
+
+    reader.readAsArrayBuffer(file);
+  }
+
   function fetchCoachingAddon() {
-    google.script.run.withSuccessHandler(res => {
-      dbCoaching = res;
-      renderCoachingInteractiveTable();
-    }).getCoachingFullData();
+    google.script.run
+      .withSuccessHandler(res => {
+        dbCoaching = res || { master: [], coaching: [], progress: [] };
+        renderCoachingInteractiveTable();
+      })
+      .withFailureHandler(err => {
+        console.error(err);
+      })
+      .getCoachingFullData();
   }
 
   function renderCoachingInteractiveTable() {
+    const body = document.getElementById('coaching-table-body');
+    if (!body) return;
+
+    const master = dbCoaching.master || [];
+    if (master.length < 2) {
+      body.innerHTML = "<tr><td colspan='5' class='empty-state'>Data Master_Karyawan belum tersedia.</td></tr>";
+      return;
+    }
+
     const list = [];
-    if (!dbCoaching.master || dbCoaching.master.length < 2) return;
-    
-    dbCoaching.master.slice(1).forEach(m => {
-      const nama = String(m[2]);
-      const coachData = dbCoaching.coaching.filter(c => c[3] === nama).sort((a,b) => new Date(b[1]) - new Date(a[1]));
-      list.push({ 
-        nik: m[1], nama: m[2], jab: m[3], cab: m[4], 
-        status: coachData.length > 0 ? coachData[0][7] : "BELUM COACHING", 
-        lastId: coachData.length > 0 ? coachData[0][0] : "" 
+    master.slice(1).forEach(m => {
+      const nama = String(m[2] || '').trim();
+      if (!nama) return;
+
+      const coachData = (dbCoaching.coaching || [])
+        .slice(1)
+        .filter(c => String(c[3] || '').trim() === nama)
+        .sort((a, b) => new Date(b[1]) - new Date(a[1]));
+
+      list.push({
+        nik: String(m[1] || '').trim(),
+        nama,
+        jab: String(m[3] || '').trim(),
+        cab: String(m[4] || '').trim(),
+        status: coachData.length > 0 ? String(coachData[0][7] || 'ONGOING') : 'BELUM COACHING',
+        lastId: coachData.length > 0 ? String(coachData[0][0] || '') : ''
       });
     });
-    
+
     window.dataTabelCoaching = list;
-    sortCoachingInteractive('nama');
+    sortCoachingInteractive(currentSort.col || 'nama', true);
   }
 
-  function sortCoachingInteractive(col) {
+  function sortCoachingInteractive(col, keepDirection) {
     const data = window.dataTabelCoaching;
-    if(!data) return;
-    if(currentSort.col === col) currentSort.asc = !currentSort.asc; else { currentSort.col = col; currentSort.asc = true; }
-    
-    data.sort((a,b) => {
-      let vA = String(a[col]).toLowerCase(); let vB = String(b[col]).toLowerCase();
-      if(vA < vB) return currentSort.asc ? -1 : 1;
-      if(vA > vB) return currentSort.asc ? 1 : -1;
+    if (!data) return;
+
+    if (keepDirection !== true) {
+      if (currentSort.col === col) currentSort.asc = !currentSort.asc;
+      else {
+        currentSort.col = col;
+        currentSort.asc = true;
+      }
+    } else {
+      currentSort.col = col;
+    }
+
+    data.sort((a, b) => {
+      const vA = String(a[col] || '').toLowerCase();
+      const vB = String(b[col] || '').toLowerCase();
+      if (vA < vB) return currentSort.asc ? -1 : 1;
+      if (vA > vB) return currentSort.asc ? 1 : -1;
       return 0;
     });
-    
+
     const h = data.map(r => `
-      <tr onclick="handleRowClickCoaching('${r.nama}', '${r.cab}', '${r.lastId}')">
-        <td>${r.nik}</td><td><b>${r.nama}</b></td><td>${r.cab}</td><td>${r.jab}</td>
-        <td><span class="badge ${r.status==='BELUM COACHING'?'bg-secondary':'bg-warning text-dark'}">${r.status}</span></td>
-      </tr>`).join('');
-    document.getElementById('coaching-table-body').innerHTML = h;
+      <tr onclick="handleRowClickCoaching(${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)})">
+        <td>${escapeHtml(r.nik)}</td>
+        <td><b>${escapeHtml(r.nama)}</b></td>
+        <td>${escapeHtml(r.cab)}</td>
+        <td>${escapeHtml(r.jab)}</td>
+        <td><span class="badge ${r.status === 'BELUM COACHING' ? 'bg-secondary' : 'bg-warning text-dark'}">${escapeHtml(r.status)}</span></td>
+      </tr>
+    `).join('');
+
+    const body = document.getElementById('coaching-table-body');
+    if (body) body.innerHTML = h || "<tr><td colspan='5' class='empty-state'>Belum ada data coaching.</td></tr>";
   }
 
   function handleRowClickCoaching(nama, cab, lastId) {
-    document.getElementById('c-staff').value = nama;
-    document.getElementById('c-cabang').value = cab;
-    document.getElementById('c-parent-id').value = lastId || "";
-    
-    if(lastId) {
-      Swal.fire({ icon: 'info', title: 'Follow Up Coaching', text: 'Karyawan sudah memiliki data coaching. Input ini akan disimpan sebagai tindak lanjut (Follow Up).' });
+    setValue('c-staff', nama || '');
+    setValue('c-cabang', cab || '');
+    setValue('c-parent-id', lastId || '');
+
+    if (lastId) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Follow Up Coaching',
+        text: 'Karyawan sudah memiliki data coaching. Input ini akan disimpan sebagai tindak lanjut.'
+      });
     }
-    switchPage('coaching');
-    window.scrollTo(0,0);
+
+    switchPage('coaching', true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function saveCoachingInteractive() {
     const obj = {
-      cabang: document.getElementById('c-cabang').value,
-      staff: document.getElementById('c-staff').value,
-      root: document.getElementById('c-root').value,
-      topic: document.getElementById('c-topic').value,
-      target: document.getElementById('c-target').value,
-      parentId: document.getElementById('c-parent-id').value,
-      bm: document.getElementById('c-bm').value,
-      region: document.getElementById('c-region').value,
-      lastPerf: document.getElementById('c-perf').value
+      cabang: getValue('c-cabang'),
+      staff: getValue('c-staff'),
+      root: getValue('c-root'),
+      topic: getValue('c-topic'),
+      target: getValue('c-target'),
+      parentId: getValue('c-parent-id'),
+      bm: getValue('c-bm'),
+      region: getValue('c-region'),
+      lastPerf: getValue('c-perf')
     };
-    if(!obj.staff || !obj.root) return Swal.fire('Error','Pilih Karyawan & Isi Root Cause','error');
-    Swal.fire({ title:'Menyimpan...', didOpen:() => Swal.showLoading() });
-    google.script.run.withSuccessHandler(() => {
-      Swal.fire('Sukses','Data Coaching / Follow-Up Tersimpan','success');
-      document.getElementById('c-root').value = "";
-      fetchCoachingAddon();
-    }).saveCoachingAction(obj);
+
+    if (!obj.staff || !obj.root) {
+      Swal.fire('Error', 'Pilih karyawan dan isi root cause.', 'error');
+      return;
+    }
+
+    Swal.fire({
+      title: 'Menyimpan...',
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+
+    google.script.run
+      .withSuccessHandler(() => {
+        Swal.fire('Sukses', 'Data Coaching / Follow-Up tersimpan.', 'success');
+        clearCoachingForm();
+        fetchCoachingAddon();
+      })
+      .withFailureHandler(err => {
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal menyimpan coaching', 'error');
+      })
+      .saveCoachingAction(obj);
   }
 
-  function debounceSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { filterTablePipe(); }, 200); }
+  function clearCoachingForm() {
+    ['c-staff', 'c-cabang', 'c-root', 'c-topic', 'c-target', 'c-parent-id', 'c-bm', 'c-region', 'c-perf']
+      .forEach(id => setValue(id, ''));
+  }
+
+  function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => filterTablePipe(), 200);
+  }
+
+  function getValue(id) {
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function setValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value;
+  }
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = value;
+  }
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function toJsString(value) {
+    return JSON.stringify(String(value || ''));
+  }
 </script>
