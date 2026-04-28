@@ -657,6 +657,17 @@
       .getCoachingFullData();
   }
 
+  function getHeaderIndex(headers, candidates, fallback) {
+    const normalized = (headers || []).map(h => String(h || '').toLowerCase().trim());
+    for (let i = 0; i < normalized.length; i++) {
+      const label = normalized[i];
+      if (!label) continue;
+      const found = candidates.some(c => label.includes(String(c).toLowerCase()));
+      if (found) return i;
+    }
+    return fallback;
+  }
+
   function renderCoachingInteractiveTable() {
     const body = document.getElementById('coaching-table-body');
     if (!body) return;
@@ -667,9 +678,25 @@
       return;
     }
 
-    const list = [];
+    coachingRows = buildCoachingRows();
+    window.dataTabelCoaching = coachingRows;
+    renderCoachingDashboard();
+    sortCoachingInteractive(currentSort.col || 'nama', true);
+  }
+
+  function buildCoachingRows() {
+    const master = dbCoaching.master || [];
+    const headers = master[0] || [];
+    const idxNik = getHeaderIndex(headers, ['nik'], 1);
+    const idxNama = getHeaderIndex(headers, ['nama karyawan', 'nama'], 2);
+    const idxJab = getHeaderIndex(headers, ['jabatan'], 3);
+    const idxRegion = getHeaderIndex(headers, ['region', 'divisi', 'departemen'], 4);
+    const idxCab = getHeaderIndex(headers, ['cabang', 'lokasi'], 5);
+    const idxRole = getHeaderIndex(headers, ['role user', 'role'], 6);
+
+    const rows = [];
     master.slice(1).forEach(m => {
-      const nama = String(m[2] || '').trim();
+      const nama = String(m[idxNama] || '').trim();
       if (!nama) return;
 
       const coachData = (dbCoaching.coaching || [])
@@ -677,22 +704,194 @@
         .filter(c => String(c[3] || '').trim() === nama)
         .sort((a, b) => new Date(b[1]) - new Date(a[1]));
 
-      list.push({
-        nik: String(m[1] || '').trim(),
+      const latest = coachData[0] || null;
+      const status = getCoachingStatus(latest);
+
+      rows.push({
+        nik: String(m[idxNik] || '').trim(),
         nama,
-        jab: String(m[3] || '').trim(),
-        cab: String(m[4] || '').trim(),
-        status: coachData.length > 0 ? String(coachData[0][7] || 'ONGOING') : 'BELUM COACHING',
-        lastId: coachData.length > 0 ? String(coachData[0][0] || '') : ''
+        jab: String(m[idxJab] || '').trim(),
+        region: String(m[idxRegion] || 'REGION LAINNYA').trim() || 'REGION LAINNYA',
+        cab: String(m[idxCab] || '').trim(),
+        role: String(m[idxRole] || '').trim(),
+        status,
+        lastId: latest ? String(latest[0] || '') : '',
+        lastDate: latest ? formatDisplayDate(latest[1]) : '-',
+        lastTopic: latest ? String(latest[5] || '') : ''
       });
     });
 
-    window.dataTabelCoaching = list;
+    return rows;
+  }
+
+  function getCoachingStatus(latest) {
+    if (!latest) return 'BELUM COACHING';
+
+    const raw = String(latest[7] || 'ON PROGRESS').toUpperCase().trim();
+    if (raw.includes('DONE')) return 'DONE';
+    if (raw.includes('NEED')) return 'NEED FU';
+    if (raw.includes('OVER')) return 'OVER DUE';
+
+    const t = new Date(latest[1]).getTime();
+    if (!isNaN(t)) {
+      const days = Math.floor((new Date().getTime() - t) / 86400000);
+      if (days > 14) return 'OVER DUE';
+    }
+
+    return 'ON PROGRESS';
+  }
+
+  function formatDisplayDate(value) {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return String(value).substring(0, 10);
+    return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function getVisibleCoachingRows() {
+    return (coachingRows || []).filter(r => {
+      const matchRegion = !coachingFilter.region || r.region === coachingFilter.region;
+      const matchCabang = !coachingFilter.cabang || r.cab === coachingFilter.cabang;
+      const matchStatus = !coachingFilter.status || r.status === coachingFilter.status;
+      return matchRegion && matchCabang && matchStatus;
+    });
+  }
+
+  function renderCoachingDashboard() {
+    renderCoachingStats();
+    renderCoachingRegionList();
+    renderCoachingBranchList();
+    updateCoachingScopeText();
+  }
+
+  function renderCoachingStats() {
+    const rows = getVisibleCoachingRows();
+    const total = rows.length || 0;
+    const counts = {
+      'BELUM COACHING': 0,
+      'NEED FU': 0,
+      'ON PROGRESS': 0,
+      'OVER DUE': 0,
+      DONE: 0
+    };
+
+    rows.forEach(r => {
+      counts[r.status] = (counts[r.status] || 0) + 1;
+    });
+
+    setCoachingStat('belum', counts['BELUM COACHING'], total);
+    setCoachingStat('need', counts['NEED FU'], total);
+    setCoachingStat('progress', counts['ON PROGRESS'], total);
+    setCoachingStat('overdue', counts['OVER DUE'], total);
+    setCoachingStat('done', counts.DONE, total);
+    setText('coach-stat-total', total.toLocaleString('id-ID'));
+  }
+
+  function setCoachingStat(id, value, total) {
+    const pct = total > 0 ? ((value / total) * 100).toFixed(0) : '0';
+    setText('coach-stat-' + id, value.toLocaleString('id-ID'));
+    setText('coach-stat-' + id + '-p', pct + '%');
+  }
+
+  function renderCoachingRegionList() {
+    const box = document.getElementById('coaching-region-list');
+    if (!box) return;
+
+    const map = {};
+    (coachingRows || []).forEach(r => {
+      if (!map[r.region]) map[r.region] = { total: 0 };
+      map[r.region].total++;
+    });
+
+    const html = Object.keys(map).sort().map(region => `
+      <button class="hierarchy-item" onclick="filterCoachingByRegion(${toJsString(region)})">
+        <span>
+          <strong>${escapeHtml(region)}</strong>
+          <small>${map[region].total.toLocaleString('id-ID')} staff</small>
+        </span>
+        <span class="hierarchy-count">${map[region].total.toLocaleString('id-ID')}</span>
+      </button>
+    `).join('');
+
+    box.innerHTML = html || '<div class="empty-state">Region belum tersedia.</div>';
+  }
+
+  function renderCoachingBranchList() {
+    const box = document.getElementById('coaching-branch-list');
+    if (!box) return;
+
+    const rows = (coachingRows || []).filter(r => !coachingFilter.region || r.region === coachingFilter.region);
+    const map = {};
+    rows.forEach(r => {
+      const cab = r.cab || 'CABANG LAINNYA';
+      if (!map[cab]) map[cab] = { total: 0 };
+      map[cab].total++;
+    });
+
+    const html = Object.keys(map).sort().map(cabang => `
+      <button class="hierarchy-item" onclick="filterCoachingByBranch(${toJsString(cabang)})">
+        <span>
+          <strong>${escapeHtml(cabang)}</strong>
+          <small>${map[cabang].total.toLocaleString('id-ID')} staff</small>
+        </span>
+        <span class="hierarchy-count">${map[cabang].total.toLocaleString('id-ID')}</span>
+      </button>
+    `).join('');
+
+    box.innerHTML = html || '<div class="empty-state">Cabang belum tersedia.</div>';
+  }
+
+  function updateCoachingScopeText() {
+    let title = 'Semua Region';
+    if (coachingFilter.region) title = coachingFilter.region;
+    if (coachingFilter.cabang) title = coachingFilter.cabang;
+    if (coachingFilter.status) title += ' - ' + coachingFilter.status;
+
+    setText('coaching-active-scope', title);
+    setText('coaching-active-subtitle', `${getVisibleCoachingRows().length.toLocaleString('id-ID')} staff tampil di tabel detail.`);
+  }
+
+  function filterCoachingByStatus(status) {
+    coachingFilter.status = status;
+    renderCoachingDashboard();
+    sortCoachingInteractive(currentSort.col || 'nama', true);
+  }
+
+  function filterCoachingByRegion(region) {
+    coachingFilter.region = region;
+    coachingFilter.cabang = '';
+    renderCoachingDashboard();
+    sortCoachingInteractive(currentSort.col || 'nama', true);
+  }
+
+  function filterCoachingByBranch(cabang) {
+    coachingFilter.cabang = cabang;
+    renderCoachingDashboard();
+    sortCoachingInteractive(currentSort.col || 'nama', true);
+  }
+
+  function resetCoachingScope() {
+    coachingFilter = { level: 'all', region: '', cabang: '', status: '' };
+    const search = document.getElementById('coaching-search');
+    if (search) search.value = '';
+    renderCoachingDashboard();
+    sortCoachingInteractive(currentSort.col || 'nama', true);
+  }
+
+  function filterCoachingDetailTable() {
     sortCoachingInteractive(currentSort.col || 'nama', true);
   }
 
   function sortCoachingInteractive(col, keepDirection) {
-    const data = window.dataTabelCoaching;
+    const data = getVisibleCoachingRows().filter(r => {
+      const keyword = (getValue('coaching-search') || '').toLowerCase().trim();
+      if (!keyword) return true;
+      return [r.nik, r.nama, r.region, r.cab, r.jab, r.status]
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword);
+    });
+
     if (!data) return;
 
     if (keepDirection !== true) {
@@ -714,23 +913,37 @@
     });
 
     const h = data.map(r => `
-      <tr onclick="handleRowClickCoaching(${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)})">
+      <tr onclick="handleRowClickCoaching(${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})">
         <td>${escapeHtml(r.nik)}</td>
         <td><b>${escapeHtml(r.nama)}</b></td>
+        <td>${escapeHtml(r.region)}</td>
         <td>${escapeHtml(r.cab)}</td>
         <td>${escapeHtml(r.jab)}</td>
-        <td><span class="badge ${r.status === 'BELUM COACHING' ? 'bg-secondary' : 'bg-warning text-dark'}">${escapeHtml(r.status)}</span></td>
+        <td><span class="coaching-status-badge ${getCoachingBadgeClass(r.status)}">${escapeHtml(r.status)}</span></td>
+        <td>${escapeHtml(r.lastDate)}</td>
       </tr>
     `).join('');
 
     const body = document.getElementById('coaching-table-body');
-    if (body) body.innerHTML = h || "<tr><td colspan='5' class='empty-state'>Belum ada data coaching.</td></tr>";
+    if (body) body.innerHTML = h || "<tr><td colspan='7' class='empty-state'>Belum ada data coaching pada filter ini.</td></tr>";
+    setText('coaching-table-subtitle', `${data.length.toLocaleString('id-ID')} staff tampil. Klik baris staff untuk mengisi form coaching.`);
   }
 
-  function handleRowClickCoaching(nama, cab, lastId) {
+  function getCoachingBadgeClass(status) {
+    const s = String(status || '').toUpperCase();
+    if (s === 'BELUM COACHING') return 'badge-belum-coaching';
+    if (s === 'NEED FU') return 'badge-need-fu';
+    if (s === 'ON PROGRESS') return 'badge-on-progress';
+    if (s === 'OVER DUE') return 'badge-over-due';
+    if (s === 'DONE') return 'badge-done';
+    return 'badge-on-progress';
+  }
+
+  function handleRowClickCoaching(nama, cab, lastId, region) {
     setValue('c-staff', nama || '');
     setValue('c-cabang', cab || '');
     setValue('c-parent-id', lastId || '');
+    setValue('c-region', region || '');
 
     if (lastId) {
       Swal.fire({
