@@ -474,10 +474,6 @@
     background: linear-gradient(135deg, #24b5b3, #0f8c95);
   }
 
-  .role-tele .role-head i {
-    background: linear-gradient(135deg, #f6a13a, #de7a16);
-  }
-
   .jab-detail {
     display: grid;
     grid-template-columns: 1fr;
@@ -715,13 +711,49 @@
 
   .role-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 
   .role-card {
+    position: relative;
+    overflow: hidden;
     height: 100%;
-    padding: 13px;
+    padding: 16px;
+    border: 1px solid transparent;
+  }
+
+  .role-card::after {
+    content: "";
+    position: absolute;
+    width: 92px;
+    height: 92px;
+    right: -34px;
+    bottom: -34px;
+    border-radius: 999px;
+    opacity: 0.12;
+  }
+
+  .role-cs {
+    border-color: rgba(27, 99, 191, 0.22);
+    background:
+      radial-gradient(circle at 100% 0%, rgba(27, 99, 191, 0.12), transparent 34%),
+      rgba(255,255,255,0.88);
+  }
+
+  .role-cs::after {
+    background: #1b63bf;
+  }
+
+  .role-spv {
+    border-color: rgba(15, 140, 149, 0.24);
+    background:
+      radial-gradient(circle at 100% 0%, rgba(15, 140, 149, 0.14), transparent 34%),
+      rgba(255,255,255,0.88);
+  }
+
+  .role-spv::after {
+    background: #0f8c95;
   }
 
   .role-badge {
@@ -751,7 +783,6 @@
 
   #cs-p { background: linear-gradient(135deg, #1b63bf, #0f3d75); }
   #spv-p { background: linear-gradient(135deg, #2db0c2, #0f8c95); }
-  #tele-p { background: linear-gradient(135deg, #f39a2d, #de7a16); }
 
   .jab-detail {
     padding-top: 8px;

@@ -10,7 +10,7 @@
 
   const pageOrder = ['home', 'pipe', 'coaching', 'admin'];
   const pageIndexMap = { home: 0, pipe: 1, coaching: 2, admin: 3 };
-  const storageKey = 'cc_modular_v2';
+  const storageKey = 'cc_modular_no_tele_v1';
 
   function initApp() {
     setDefaultDates();
@@ -131,7 +131,7 @@
         staffSelect.innerHTML = '<option value="">Semua Staff</option>';
         [...new Set(
           (db.achv || [])
-            .filter(r => (c === '' || r[1] === c) && r[3] !== 'tele')
+            .filter(r => c === '' || r[1] === c)
             .map(r => r[2])
             .filter(Boolean)
         )].sort().forEach(st => staffSelect.add(new Option(st, st)));
@@ -149,8 +149,7 @@
     const resA = {
       global: { r: 0, t: 0 },
       cs: { r: 0, t: 0 },
-      spv: { r: 0, t: 0 },
-      tele: { r: 0, t: 0 }
+      spv: { r: 0, t: 0 }
     };
 
     latestAchv.forEach(r => {
@@ -168,7 +167,7 @@
     const pG = resA.global.t > 0 ? ((resA.global.r / resA.global.t) * 100).toFixed(1) : '0.0';
     setText('g-p', pG + '%');
 
-    ['cs', 'spv', 'tele'].forEach(k => {
+    ['cs', 'spv'].forEach(k => {
       const p = resA[k].t > 0 ? ((resA[k].r / resA[k].t) * 100).toFixed(1) : '0.0';
       setText(k + '-p', p + '%');
       setText(k + '-tgt', 'Rp ' + resA[k].t.toLocaleString('id-ID'));

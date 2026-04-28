@@ -37,14 +37,14 @@ function isJunkBranch(val) {
 
 function getDashboardData() {
   var cache = CacheService.getScriptCache();
-  var cached = cache.get("db_v181");
+  var cached = cache.get("db_v181_no_tele");
   if (cached) return JSON.parse(cached);
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var res = { u: getUserData(), achv: [], cair: [], pipeline: [], listCHome: [], listCPipe: [], listS: [] };
 
   try {
-    ["Raw_Achv_CS", "Raw_Achv_SPV", "Raw_Achv_Tele"].forEach(name => {
+    ["Raw_Achv_CS", "Raw_Achv_SPV"].forEach(name => {
       var sh = ss.getSheetByName(name); if (!sh || sh.getLastRow() < 1) return;
       var data = sh.getDataRange().getValues();
       var key = name.split('_')[2].toLowerCase();
@@ -57,7 +57,7 @@ function getDashboardData() {
       });
     });
 
-    ["Raw_Cair_CS", "Raw_Cair_SPV", "Raw_Cair_Tele"].forEach(name => {
+    ["Raw_Cair_CS", "Raw_Cair_SPV"].forEach(name => {
       var sh = ss.getSheetByName(name); if (!sh || sh.getLastRow() < 1) return;
       var data = sh.getDataRange().getValues();
       data.forEach(r => {
@@ -89,7 +89,7 @@ function getDashboardData() {
         res.pipeline.push([tglIn, msec, deb, stat, mix, kep, sal, pla, cab]);
       });
     }
-    cache.put("db_v181", JSON.stringify(res), 300);
+    cache.put("db_v181_no_tele", JSON.stringify(res), 300);
     return res;
   } catch(e) { return res; }
 }
@@ -99,7 +99,8 @@ function processExcelData(rows, tgl, tipe) {
   try {
     lock.waitLock(30000);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var map = { "1":"Raw_Achv_CS", "2":"Raw_Achv_SPV", "3":"Raw_Achv_Tele", "4":"Raw_Cair_CS", "5":"Raw_Cair_SPV", "6":"Raw_Cair_Tele", "7":"Raw_Pipeline" };
+    var map = { "1":"Raw_Achv_CS", "2":"Raw_Achv_SPV", "4":"Raw_Cair_CS", "5":"Raw_Cair_SPV", "7":"Raw_Pipeline" };
+    if (!map[tipe]) return "❌ Jenis upload tidak dikenali.";
     var sh = ss.getSheetByName(map[tipe]) || ss.insertSheet(map[tipe]);
     var finalData = [];
     var clean = v => { if (!v || v === "-" || v === "" || v === 0) return 0; return parseFloat(v.toString().replace(/\./g, "").replace(/,/g, ".")) || 0; };
@@ -118,7 +119,7 @@ function processExcelData(rows, tgl, tipe) {
       sh.clearContents();
       if (filtered.length > 0) sh.getRange(1, 1, filtered.length, filtered[0].length).setValues(filtered);
       sh.getRange(sh.getLastRow() + 1, 1, finalData.length, finalData[0].length).setValues(finalData);
-      CacheService.getScriptCache().remove("db_v181");
+      CacheService.getScriptCache().remove("db_v181_no_tele");
       return "✅ Berhasil.";
     }
   } catch(e) { return "❌ Error: " + e.message; } finally { lock.releaseLock(); }
