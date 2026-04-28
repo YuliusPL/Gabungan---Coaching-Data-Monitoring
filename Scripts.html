@@ -433,11 +433,16 @@
 
   function updatePageTransform() {
     const track = document.getElementById('page-track');
-    if (!track) return;
+    if (track) {
+      track.style.transition = 'none';
+      track.style.transform = 'none';
+    }
 
-    const idx = pageIndexMap[currentPage] || 0;
-    track.style.transition = 'transform 0.32s cubic-bezier(.2,.8,.2,1)';
-    track.style.transform = `translateX(-${idx * 100}vw)`;
+    pageOrder.forEach(page => {
+      const panel = document.getElementById('panel-' + page);
+      if (panel) panel.style.display = page === currentPage ? 'block' : 'none';
+    });
+
     updateHeaderSubtitle();
   }
 
@@ -482,69 +487,8 @@
   }
 
   function setupSwipeNavigation() {
-    const container = document.getElementById('page-container');
-    const track = document.getElementById('page-track');
-    if (!container || !track) return;
-
-    let startX = 0;
-    let startY = 0;
-    let currentX = 0;
-    let isDragging = false;
-    let isHorizontal = false;
-
-    container.addEventListener('touchstart', (e) => {
-      if (!e.touches || !e.touches.length) return;
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      currentX = startX;
-      isDragging = true;
-      isHorizontal = false;
-      track.style.transition = 'none';
-    }, { passive: true });
-
-    container.addEventListener('touchmove', (e) => {
-      if (!isDragging || !e.touches || !e.touches.length) return;
-
-      currentX = e.touches[0].clientX;
-      const currentY = e.touches[0].clientY;
-      const diffX = currentX - startX;
-      const diffY = currentY - startY;
-
-      if (!isHorizontal) {
-        if (Math.abs(diffX) > 10 && Math.abs(diffX) > Math.abs(diffY)) {
-          isHorizontal = true;
-        } else if (Math.abs(diffY) > Math.abs(diffX)) {
-          return;
-        }
-      }
-
-      if (!isHorizontal) return;
-
-      const currentIndex = pageIndexMap[currentPage] || 0;
-      const base = -currentIndex * window.innerWidth;
-      track.style.transform = `translateX(${base + diffX}px)`;
-    }, { passive: true });
-
-    container.addEventListener('touchend', () => {
-      if (!isDragging) return;
-
-      const diffX = currentX - startX;
-      const threshold = 60;
-      const currentIndex = pageIndexMap[currentPage] || 0;
-
-      if (Math.abs(diffX) > threshold) {
-        if (diffX < 0 && currentIndex < pageOrder.length - 1) {
-          currentPage = pageOrder[currentIndex + 1];
-        } else if (diffX > 0 && currentIndex > 0) {
-          currentPage = pageOrder[currentIndex - 1];
-        }
-      }
-
-      updatePageTransform(true);
-      updateActiveNavigation(currentPage);
-      isDragging = false;
-      isHorizontal = false;
-    }, { passive: true });
+    // Disabled intentionally: Apps Script web app containers can render 100vw slide tracks
+    // inconsistently on desktop. Navigation remains stable through header and bottom tabs.
   }
 
   function refreshData() {

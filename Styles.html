@@ -162,20 +162,22 @@
 
   .page-container {
     width: 100%;
-    overflow: hidden;
-    touch-action: pan-y;
+    overflow: visible;
   }
 
   .page-track {
-    width: 400%;
-    display: flex;
-    transition: transform 0.32s cubic-bezier(.2,.8,.2,1);
-    will-change: transform;
+    width: 100%;
+    display: block;
+    transform: none !important;
   }
 
   .page-panel {
-    width: 100vw;
-    flex: 0 0 100vw;
+    width: 100%;
+    display: none;
+  }
+
+  .page-panel.active {
+    display: block;
   }
 
   .page-scroll {
