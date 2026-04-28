@@ -1,101 +1,177 @@
 <div id="v-coaching" class="view-section">
   <div class="section-hero section-hero-coaching">
     <div>
-      <span class="section-chip">Coaching Center</span>
-      <h2>Pendampingan Staff</h2>
-      <p>Pilih karyawan dari daftar, catat root cause, lalu simpan action plan atau follow up coaching.</p>
+      <span class="section-chip chip-coaching">Coaching Center</span>
+      <h2>Monitoring Coaching</h2>
+      <p>Pantau status coaching dari Region, Cabang, sampai detail staff.</p>
     </div>
     <div class="hero-icon">
       <i class="bi bi-person-badge-fill"></i>
     </div>
   </div>
 
-  <div class="content-grid coaching-grid">
-    <div class="card-mewah coaching-form-card">
-      <div class="card-title-row">
+  <div class="coaching-filter-bar">
+    <div class="active-scope-card">
+      <span class="eyebrow">Scope Aktif</span>
+      <b id="coaching-active-scope">Semua Region</b>
+      <small id="coaching-active-subtitle">Klik kartu status, region, atau cabang untuk melihat detail.</small>
+    </div>
+    <button class="btn btn-coaching-reset" onclick="resetCoachingScope()">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+    </button>
+  </div>
+
+  <div class="coaching-status-grid" id="coaching-status-grid">
+    <div class="coaching-status-card st-belum" onclick="filterCoachingByStatus('BELUM COACHING')">
+      <strong id="coach-stat-belum">0</strong>
+      <span>BELUM COACHING</span>
+      <small id="coach-stat-belum-p">0%</small>
+    </div>
+    <div class="coaching-status-card st-need" onclick="filterCoachingByStatus('NEED FU')">
+      <strong id="coach-stat-need">0</strong>
+      <span>NEED FU</span>
+      <small id="coach-stat-need-p">0%</small>
+    </div>
+    <div class="coaching-status-card st-progress" onclick="filterCoachingByStatus('ON PROGRESS')">
+      <strong id="coach-stat-progress">0</strong>
+      <span>ON PROGRESS</span>
+      <small id="coach-stat-progress-p">0%</small>
+    </div>
+    <div class="coaching-status-card st-overdue" onclick="filterCoachingByStatus('OVER DUE')">
+      <strong id="coach-stat-overdue">0</strong>
+      <span>OVER DUE</span>
+      <small id="coach-stat-overdue-p">0%</small>
+    </div>
+    <div class="coaching-status-card st-done" onclick="filterCoachingByStatus('DONE')">
+      <strong id="coach-stat-done">0</strong>
+      <span>DONE</span>
+      <small id="coach-stat-done-p">0%</small>
+    </div>
+    <div class="coaching-status-card st-total" onclick="resetCoachingScope()">
+      <strong id="coach-stat-total">0</strong>
+      <span>TOTAL</span>
+      <small>100%</small>
+    </div>
+  </div>
+
+  <div class="coaching-monitor-grid">
+    <div class="card-mewah p-0 overflow-hidden">
+      <div class="table-card-head">
         <div>
-          <span class="eyebrow">Form Input</span>
-          <h3>Coaching / Follow Up</h3>
+          <span class="eyebrow">Region</span>
+          <h3>Ringkasan Region</h3>
         </div>
-        <i class="bi bi-pencil-square card-watermark"></i>
       </div>
-
-      <input type="hidden" id="c-parent-id">
-
-      <div class="form-grid">
-        <div class="form-group span-2">
-          <label class="form-label-lite">Nama Staff</label>
-          <input type="text" id="c-staff" class="form-control" placeholder="Pilih dari tabel atau isi manual">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label-lite">Cabang</label>
-          <input type="text" id="c-cabang" class="form-control" placeholder="Cabang">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label-lite">Last Performance</label>
-          <input type="text" id="c-perf" class="form-control" placeholder="Contoh: Ach 65%">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label-lite">BM</label>
-          <input type="text" id="c-bm" class="form-control" placeholder="Nama BM">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label-lite">Region</label>
-          <input type="text" id="c-region" class="form-control" placeholder="Region">
-        </div>
-
-        <div class="form-group span-2">
-          <label class="form-label-lite">Root Cause</label>
-          <textarea id="c-root" class="form-control" rows="4" placeholder="Tuliskan akar masalah yang perlu ditindaklanjuti"></textarea>
-        </div>
-
-        <div class="form-group span-2">
-          <label class="form-label-lite">Topic Coaching</label>
-          <input type="text" id="c-topic" class="form-control" placeholder="Topik pembahasan coaching">
-        </div>
-
-        <div class="form-group span-2">
-          <label class="form-label-lite">Target / Action Plan</label>
-          <textarea id="c-target" class="form-control" rows="4" placeholder="Target perbaikan, komitmen, dan rencana tindak lanjut"></textarea>
-        </div>
-
-        <button class="btn btn-coaching span-2" onclick="saveCoachingInteractive()">
-          <i class="bi bi-check2-circle me-2"></i>Simpan Coaching
-        </button>
+      <div id="coaching-region-list" class="coaching-list-box">
+        <div class="empty-state">Memuat region...</div>
       </div>
     </div>
 
     <div class="card-mewah p-0 overflow-hidden">
       <div class="table-card-head">
         <div>
-          <span class="eyebrow">Monitoring</span>
-          <h3>Daftar Karyawan</h3>
+          <span class="eyebrow">Cabang</span>
+          <h3>Ringkasan Cabang</h3>
         </div>
-        <span class="table-hint">Klik header untuk sort</span>
+      </div>
+      <div id="coaching-branch-list" class="coaching-list-box">
+        <div class="empty-state">Memuat cabang...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-mewah p-0 overflow-hidden shadow-sm">
+    <div class="table-toolbar">
+      <div>
+        <b>Detail Data Coaching</b>
+        <small id="coaching-table-subtitle">Klik baris staff untuk mengisi form coaching.</small>
+      </div>
+      <input
+        type="text"
+        id="coaching-search"
+        class="form-control form-control-sm"
+        placeholder="Cari NIK / nama / cabang / status"
+        onkeyup="filterCoachingDetailTable()"
+      >
+    </div>
+
+    <div class="table-scroll coaching-detail-scroll">
+      <table class="table table-sm table-hover mb-0 sticky-table-head data-table coaching-detail-table">
+        <thead>
+          <tr>
+            <th onclick="sortCoachingInteractive('nik')">NIK</th>
+            <th onclick="sortCoachingInteractive('nama')">NAMA</th>
+            <th onclick="sortCoachingInteractive('region')">REGION</th>
+            <th onclick="sortCoachingInteractive('cab')">CABANG</th>
+            <th onclick="sortCoachingInteractive('jab')">JABATAN</th>
+            <th onclick="sortCoachingInteractive('status')">STATUS</th>
+            <th>LAST COACHING</th>
+          </tr>
+        </thead>
+        <tbody id="coaching-table-body">
+          <tr>
+            <td colspan="7" class="empty-state">Memuat data coaching...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card-mewah coaching-form-card mt-3">
+    <div class="card-title-row">
+      <div>
+        <span class="eyebrow">Form Input</span>
+        <h3>Coaching / Follow Up</h3>
+      </div>
+      <i class="bi bi-pencil-square card-watermark"></i>
+    </div>
+
+    <input type="hidden" id="c-parent-id">
+
+    <div class="form-grid">
+      <div class="form-group span-2">
+        <label class="form-label-lite">Nama Staff</label>
+        <input type="text" id="c-staff" class="form-control" placeholder="Pilih dari tabel atau isi manual">
       </div>
 
-      <div class="table-scroll coaching-table-scroll">
-        <table class="table-interaktif sticky-table-head">
-          <thead>
-            <tr>
-              <th onclick="sortCoachingInteractive('nik')">NIK</th>
-              <th onclick="sortCoachingInteractive('nama')">Nama</th>
-              <th onclick="sortCoachingInteractive('cab')">Cabang</th>
-              <th onclick="sortCoachingInteractive('jab')">Jabatan</th>
-              <th onclick="sortCoachingInteractive('status')">Status</th>
-            </tr>
-          </thead>
-          <tbody id="coaching-table-body">
-            <tr>
-              <td colspan="5" class="empty-state">Memuat data karyawan...</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="form-group">
+        <label class="form-label-lite">Cabang</label>
+        <input type="text" id="c-cabang" class="form-control" placeholder="Cabang">
       </div>
+
+      <div class="form-group">
+        <label class="form-label-lite">Last Performance</label>
+        <input type="text" id="c-perf" class="form-control" placeholder="Contoh: Ach 65%">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label-lite">BM</label>
+        <input type="text" id="c-bm" class="form-control" placeholder="Nama BM">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label-lite">Region</label>
+        <input type="text" id="c-region" class="form-control" placeholder="Region">
+      </div>
+
+      <div class="form-group span-2">
+        <label class="form-label-lite">Root Cause</label>
+        <textarea id="c-root" class="form-control" rows="4" placeholder="Tuliskan akar masalah yang perlu ditindaklanjuti"></textarea>
+      </div>
+
+      <div class="form-group span-2">
+        <label class="form-label-lite">Topic Coaching</label>
+        <input type="text" id="c-topic" class="form-control" placeholder="Topik pembahasan coaching">
+      </div>
+
+      <div class="form-group span-2">
+        <label class="form-label-lite">Target / Action Plan</label>
+        <textarea id="c-target" class="form-control" rows="4" placeholder="Target perbaikan, komitmen, dan rencana tindak lanjut"></textarea>
+      </div>
+
+      <button class="btn btn-coaching span-2" onclick="saveCoachingInteractive()">
+        <i class="bi bi-check2-circle me-2"></i>Simpan Coaching
+      </button>
     </div>
   </div>
 </div>

@@ -129,7 +129,7 @@ function processExcelData(rows, tgl, tipe) {
 
 function getCoachingFullData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var shM = ss.getSheetByName('Master_Karyawan');
+  var shM = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
   var shC = ss.getSheetByName('Raw_Coaching') || ss.insertSheet('Raw_Coaching');
   var shP = ss.getSheetByName('Raw_Coaching_Progress') || ss.insertSheet('Raw_Coaching_Progress');
   
