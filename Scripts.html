@@ -88,8 +88,25 @@
 
     fillSelect('f-c', db.listCHome, 'Semua Cabang');
     fillSelect('p-c', db.listCPipe, 'Semua Cabang');
+    setPipelineDateRangeFromData();
     syncSalesByBranch();
     runFilter(true);
+  }
+
+  function setPipelineDateRangeFromData() {
+    const startEl = document.getElementById('p-start');
+    const endEl = document.getElementById('p-end');
+    if (!startEl || !endEl || !(db.pipeline || []).length) return;
+
+    const dates = (db.pipeline || [])
+      .map(r => String(r[0] || '').substring(0, 10))
+      .filter(v => /^\d{4}-\d{2}-\d{2}$/.test(v))
+      .sort();
+
+    if (!dates.length) return;
+
+    startEl.value = dates[0];
+    endEl.value = dates[dates.length - 1];
   }
 
   function fillSelect(id, list, placeholder) {
@@ -356,8 +373,11 @@
 
     const top = document.getElementById('top-sales-list');
     const bot = document.getElementById('bot-sales-list');
-    if (top) top.innerHTML = topHtml || '<div class="empty-state">Belum ada data</div>';
-    if (bot) bot.innerHTML = botHtml || '<div class="empty-state">Belum ada data</div>';
+    const emptyMessage = rows.length
+      ? '<div class="empty-state">Belum ada peringkat sales</div>'
+      : '<div class="empty-state">Tidak ada data pada filter ini. Cek tanggal, cabang, atau sales.</div>';
+    if (top) top.innerHTML = topHtml || emptyMessage;
+    if (bot) bot.innerHTML = botHtml || emptyMessage;
 
     renderPipelineMixChart(productMix);
   }
@@ -420,7 +440,9 @@
     });
 
     const body = document.getElementById('pipe-body');
-    if (body) body.innerHTML = h || "<tr><td colspan='5' class='text-center p-4'>Kosong</td></tr>";
+    if (body) {
+      body.innerHTML = h || "<tr><td colspan='5' class='empty-state'>Tidak ada data pipeline pada filter ini.</td></tr>";
+    }
     setText('p-info', `${data.length} Data Terfilter`);
   }
 
