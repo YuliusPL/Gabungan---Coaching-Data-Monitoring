@@ -124,11 +124,11 @@
       <table class="table table-sm table-hover mb-0 sticky-table-head data-table">
         <thead>
           <tr>
-            <th>DEBITUR</th>
-            <th>SALES</th>
-            <th>STATUS</th>
-            <th>KEPUTUSAN</th>
-            <th>PLAFOND</th>
+            <th class="sortable-th" onclick="sortPipelineTable('debitur')">DEBITUR <span id="sort-debitur" class="sort-indicator"></span></th>
+            <th class="sortable-th" onclick="sortPipelineTable('sales')">SALES <span id="sort-sales" class="sort-indicator"></span></th>
+            <th class="sortable-th" onclick="sortPipelineTable('status')">STATUS <span id="sort-status" class="sort-indicator"></span></th>
+            <th class="sortable-th" onclick="sortPipelineTable('keputusan')">KEPUTUSAN <span id="sort-keputusan" class="sort-indicator"></span></th>
+            <th class="sortable-th" onclick="sortPipelineTable('plafond')">PLAFOND <span id="sort-plafond" class="sort-indicator"></span></th>
           </tr>
         </thead>
         <tbody id="pipe-body"></tbody>

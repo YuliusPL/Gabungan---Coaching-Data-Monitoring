@@ -6,6 +6,7 @@
   let rowLimit = 25;
   let searchTimeout = null;
   let currentSort = { col: 'nama', asc: true };
+  let pipeSort = { col: 'debitur', asc: true };
   let currentPage = 'home';
 
   const pageOrder = ['home', 'pipe', 'coaching', 'admin'];
@@ -300,7 +301,7 @@
   function filterTablePipe() {
     const keyword = (getValue('p-search') || '').toLowerCase().trim();
     if (!keyword) {
-      renderTablePipe(pipeFiltered);
+      renderTablePipe(sortPipeRows(pipeFiltered));
       return;
     }
 
@@ -311,7 +312,60 @@
         .includes(keyword);
     });
 
-    renderTablePipe(filtered);
+    renderTablePipe(sortPipeRows(filtered));
+  }
+
+  function sortPipeTable(col) {
+    if (pipeSort.col === col) {
+      pipeSort.asc = !pipeSort.asc;
+    } else {
+      pipeSort.col = col;
+      pipeSort.asc = true;
+    }
+
+    filterTablePipe();
+    updatePipeSortIndicators();
+  }
+
+  function sortPipeRows(rows) {
+    const indexMap = {
+      debitur: 2,
+      sales: 6,
+      status: 3,
+      keputusan: 5,
+      plafond: 7
+    };
+
+    const idx = indexMap[pipeSort.col];
+    const sorted = [...(rows || [])];
+
+    sorted.sort((a, b) => {
+      let vA = a[idx];
+      let vB = b[idx];
+
+      if (pipeSort.col === 'plafond') {
+        vA = Number(vA) || 0;
+        vB = Number(vB) || 0;
+        return pipeSort.asc ? vA - vB : vB - vA;
+      }
+
+      vA = String(vA || '').toLowerCase();
+      vB = String(vB || '').toLowerCase();
+
+      if (vA < vB) return pipeSort.asc ? -1 : 1;
+      if (vA > vB) return pipeSort.asc ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }
+
+  function updatePipeSortIndicators() {
+    ['debitur', 'sales', 'status', 'keputusan', 'plafond'].forEach(col => {
+      const el = document.getElementById('sort-' + col);
+      if (!el) return;
+      el.innerText = pipeSort.col === col ? (pipeSort.asc ? '▲' : '▼') : '↕';
+    });
   }
 
   function calculatePipeline() {
@@ -455,6 +509,7 @@
       body.innerHTML = h || "<tr><td colspan='5' class='empty-state'>Tidak ada data pipeline pada filter ini.</td></tr>";
     }
     setText('p-info', `${data.length} Data Terfilter`);
+    updatePipeSortIndicators();
   }
 
   function switchPage(page, forceMove = false) {
