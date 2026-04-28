@@ -54,23 +54,23 @@
       <div class="card-mewah funnel-card">
         <div class="funnel-box st-apk">
           <span>APK Masuk</span>
-          <span class="funnel-metric"><b id="fn-naik">0</b><small id="fn-naik-p">0%</small></span>
+          <span id="fn-naik" class="funnel-value"><b>0</b><small>0%</small></span>
         </div>
         <div class="funnel-box st-app">
           <span>Approve</span>
-          <span class="funnel-metric"><b id="fn-app">0</b><small id="fn-app-p">0%</small></span>
+          <span id="fn-app" class="funnel-value"><b>0</b><small>0%</small></span>
         </div>
         <div class="funnel-box st-pen">
           <span>Pending</span>
-          <span class="funnel-metric"><b id="fn-pen">0</b><small id="fn-pen-p">0%</small></span>
+          <span id="fn-pen" class="funnel-value"><b>0</b><small>0%</small></span>
         </div>
         <div class="funnel-box st-rej">
           <span>Reject</span>
-          <span class="funnel-metric"><b id="fn-rej">0</b><small id="fn-rej-p">0%</small></span>
+          <span id="fn-rej" class="funnel-value"><b>0</b><small>0%</small></span>
         </div>
         <div class="funnel-box st-cair">
           <span>Cair</span>
-          <span class="funnel-metric"><b id="fn-cair">0</b><small id="fn-cair-p">0%</small></span>
+          <span id="fn-cair" class="funnel-value"><b>0</b><small>0%</small></span>
         </div>
       </div>
     </div>
