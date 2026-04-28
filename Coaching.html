@@ -1,0 +1,43 @@
+<div id="v-coaching" style="display:none">
+  <div class="card-mewah mb-3 shadow-sm" style="border-top: 5px solid var(--primary);">
+    <h6 class="fw-bold text-primary mb-3 small"><i class="bi bi-pencil-square me-2"></i>FORM COACHING CHAT (FOLLOW UP)</h6>
+    <div class="row g-2">
+      <input type="hidden" id="c-parent-id">
+      <div class="col-4"><label class="small fw-bold" style="font-size:9px;">Cabang</label><input type="text" id="c-cabang" class="form-control form-control-sm bg-light" readonly></div>
+      <div class="col-4"><label class="small fw-bold" style="font-size:9px;">BM</label><input type="text" id="c-bm" class="form-control form-control-sm"></div>
+      <div class="col-4"><label class="small fw-bold" style="font-size:9px;">Region</label><input type="text" id="c-region" class="form-control form-control-sm"></div>
+      
+      <div class="col-6"><label class="small fw-bold" style="font-size:9px;">Karyawan (Coachee)</label><input type="text" id="c-staff" class="form-control form-control-sm bg-light" readonly></div>
+      <div class="col-6"><label class="small fw-bold" style="font-size:9px;">Last Performance</label><input type="text" id="c-perf" class="form-control form-control-sm"></div>
+      
+      <div class="col-12 mt-2"><label class="small fw-bold">Root Causes</label><textarea id="c-root" class="form-control form-control-sm" rows="3"></textarea></div>
+      <div class="col-12 mt-2"><label class="small fw-bold">Coaching Topic & Target</label>
+        <input type="text" id="c-topic" class="form-control form-control-sm mb-1" placeholder="Topic">
+        <input type="text" id="c-target" class="form-control form-control-sm" placeholder="Target">
+      </div>
+      <div class="col-12 mt-3"><button class="btn btn-primary w-100 fw-bold shadow" onclick="saveCoachingInteractive()">SIMPAN SEBAGAI DATA BARU (FOLLOW UP)</button></div>
+    </div>
+  </div>
+
+  <div class="card-mewah p-0 overflow-hidden shadow-sm">
+    <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+      <h6 class="fw-bold mb-0 small">MONITORING STATUS COACHING (ALL MASTER)</h6>
+    </div>
+    <div class="table-responsive">
+      <table class="table-interaktif">
+        <thead>
+          <tr>
+            <th onclick="sortCoachingInteractive('nik')">NIK</th>
+            <th onclick="sortCoachingInteractive('nama')">NAMA</th>
+            <th onclick="sortCoachingInteractive('cab')">CABANG</th>
+            <th onclick="sortCoachingInteractive('jab')">JABATAN</th>
+            <th onclick="sortCoachingInteractive('status')">STATUS</th>
+          </tr>
+        </thead>
+        <tbody id="coaching-table-body">
+          <tr><td colspan="5" class="text-center p-4">Memuat Data Karyawan...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
