@@ -8,6 +8,8 @@
   let currentSort = { col: 'nama', asc: true };
   let pipeSort = { col: 'debitur', asc: true };
   let coachingRows = [];
+  let selectedCoachingStaffKey = '';
+  let coachingLastFocus = { region: '', cabang: '', status: 'BELUM COACHING', staffKey: '' };
   let coachingFilter = { level: 'all', region: '', cabang: '', status: 'BELUM COACHING' };
   const coachingRegionBuckets = ['REGION 1', 'REGION 2', 'REGION 3', 'REGION 4', 'LAINNYA'];
   let currentPage = 'home';
@@ -707,8 +709,17 @@
 
     coachingRows = buildCoachingRows();
     window.dataTabelCoaching = coachingRows;
+    applyCoachingLastFocus();
     renderCoachingDashboard();
     sortCoachingInteractive(currentSort.col || 'nama', true);
+  }
+
+  function applyCoachingLastFocus() {
+    if (!coachingLastFocus) return;
+    if (coachingLastFocus.status) coachingFilter.status = coachingLastFocus.status;
+    if (coachingLastFocus.region) coachingFilter.region = coachingLastFocus.region;
+    if (coachingLastFocus.cabang) coachingFilter.cabang = coachingLastFocus.cabang;
+    if (coachingLastFocus.staffKey) selectedCoachingStaffKey = coachingLastFocus.staffKey;
   }
 
   function buildCoachingRows() {
@@ -938,6 +949,7 @@
       coachingFilter.region = '';
       coachingFilter.cabang = '';
     }
+    coachingLastFocus = { region: coachingFilter.region, cabang: coachingFilter.cabang, status: coachingFilter.status, staffKey: selectedCoachingStaffKey };
     renderCoachingDashboard();
     sortCoachingInteractive(currentSort.col || 'nama', true);
   }
@@ -946,6 +958,7 @@
     coachingFilter.region = region;
     coachingFilter.cabang = '';
     coachingFilter.status = 'BELUM COACHING';
+    coachingLastFocus = { region: coachingFilter.region, cabang: '', status: coachingFilter.status, staffKey: selectedCoachingStaffKey };
     renderCoachingDashboard();
     sortCoachingInteractive(currentSort.col || 'nama', true);
   }
@@ -953,12 +966,15 @@
   function filterCoachingByBranch(cabang) {
     coachingFilter.cabang = cabang;
     if (!coachingFilter.status) coachingFilter.status = 'BELUM COACHING';
+    coachingLastFocus = { region: coachingFilter.region, cabang: coachingFilter.cabang, status: coachingFilter.status, staffKey: selectedCoachingStaffKey };
     renderCoachingDashboard();
     sortCoachingInteractive(currentSort.col || 'nama', true);
   }
 
   function resetCoachingScope() {
     coachingFilter = { level: 'all', region: '', cabang: '', status: 'BELUM COACHING' };
+    selectedCoachingStaffKey = '';
+    coachingLastFocus = { region: '', cabang: '', status: 'BELUM COACHING', staffKey: '' };
     const search = document.getElementById('coaching-search');
     if (search) search.value = '';
     renderCoachingDashboard();
@@ -999,8 +1015,11 @@
       return 0;
     });
 
-    const h = data.map(r => `
-      <tr onclick="handleRowClickCoaching(${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})" ondblclick="handleRowClickCoaching(${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})">
+    const h = data.map(r => {
+      const staffKey = `${r.nik}__${r.nama}`;
+      const activeClass = selectedCoachingStaffKey === staffKey ? 'coaching-row-active' : '';
+      return `
+      <tr class="${activeClass}" onclick="handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})" ondblclick="handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})">
         <td>${escapeHtml(r.nik)}</td>
         <td><b>${escapeHtml(r.nama)}</b></td>
         <td>${escapeHtml(r.region)}</td>
@@ -1009,7 +1028,8 @@
         <td><span class="coaching-status-badge ${getCoachingBadgeClass(r.status)}">${escapeHtml(r.status)}</span></td>
         <td>${escapeHtml(r.lastDate)}</td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
 
     const body = document.getElementById('coaching-table-body');
     if (body) body.innerHTML = h || "<tr><td colspan='7' class='empty-state'>Belum ada data coaching pada filter ini.</td></tr>";
@@ -1026,11 +1046,14 @@
     return 'badge-on-progress';
   }
 
-  function handleRowClickCoaching(nama, cab, lastId, region) {
+  function handleRowClickCoaching(nik, nama, cab, lastId, region) {
+    selectedCoachingStaffKey = `${nik}__${nama}`;
+    coachingLastFocus = { region: coachingFilter.region, cabang: coachingFilter.cabang, status: coachingFilter.status || 'BELUM COACHING', staffKey: selectedCoachingStaffKey };
     setValue('c-staff', nama || '');
     setValue('c-cabang', cab || '');
     setValue('c-parent-id', lastId || '');
     setValue('c-region', region || '');
+    clearCoachingFieldErrors();
 
     if (lastId) {
       Swal.fire({
@@ -1046,6 +1069,7 @@
   }
 
   function startNewCoachingInput() {
+    selectedCoachingStaffKey = '';
     setValue('c-parent-id', '');
     setValue('c-staff', '');
     setValue('c-cabang', '');
@@ -1055,8 +1079,36 @@
     setValue('c-target', '');
     setValue('c-bm', '');
     setValue('c-perf', '');
+    clearCoachingFieldErrors();
     const form = document.getElementById('coaching-form-section');
     if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function clearCoachingFieldErrors() {
+    ['c-staff', 'c-cabang', 'c-region', 'c-root', 'c-topic', 'c-target'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('input-error');
+    });
+  }
+
+  function validateCoachingForm(obj) {
+    const required = [
+      { id: 'c-staff', value: obj.staff, label: 'Nama Staff' },
+      { id: 'c-cabang', value: obj.cabang, label: 'Cabang' },
+      { id: 'c-region', value: obj.region, label: 'Region' },
+      { id: 'c-root', value: obj.root, label: 'Root Cause' },
+      { id: 'c-topic', value: obj.topic, label: 'Topic Coaching' },
+      { id: 'c-target', value: obj.target, label: 'Target / Action Plan' }
+    ];
+
+    clearCoachingFieldErrors();
+    const missing = required.filter(f => !String(f.value || '').trim());
+    missing.forEach(f => {
+      const el = document.getElementById(f.id);
+      if (el) el.classList.add('input-error');
+    });
+
+    return missing;
   }
 
   function saveCoachingInteractive() {
@@ -1072,8 +1124,9 @@
       lastPerf: getValue('c-perf')
     };
 
-    if (!obj.staff || !obj.root) {
-      Swal.fire('Error', 'Pilih karyawan dan isi root cause.', 'error');
+    const missing = validateCoachingForm(obj);
+    if (missing.length) {
+      Swal.fire('Validasi', `Field wajib belum lengkap: ${missing.map(f => f.label).join(', ')}`, 'warning');
       return;
     }
 
@@ -1086,6 +1139,12 @@
     google.script.run
       .withSuccessHandler(() => {
         Swal.fire('Sukses', 'Data Coaching / Follow-Up tersimpan.', 'success');
+        coachingLastFocus = {
+          region: obj.region || coachingFilter.region || '',
+          cabang: obj.cabang || coachingFilter.cabang || '',
+          status: 'BELUM COACHING',
+          staffKey: selectedCoachingStaffKey
+        };
         clearCoachingForm();
         fetchCoachingAddon();
       })
