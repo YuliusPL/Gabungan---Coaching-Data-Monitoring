@@ -862,7 +862,7 @@
       const count = map[region] || 0;
       const active = coachingFilter.region === region ? ' active' : '';
       return `
-        <button class="coaching-region-card${active}" onclick="filterCoachingByRegion(${toJsString(region)})">
+        <button class="coaching-region-card${active}" onclick='filterCoachingByRegion(${toJsString(region)})'>
           <strong>${count.toLocaleString('id-ID')}</strong>
           <span>${escapeHtml(region)}</span>
           <small>Belum coaching</small>
@@ -891,7 +891,7 @@
     const html = Object.keys(map)
       .sort((a, b) => (map[b].total - map[a].total) || a.localeCompare(b))
       .map(cabang => `
-      <button class="hierarchy-item${coachingFilter.cabang === cabang ? ' active' : ''}" onclick="filterCoachingByBranch(${toJsString(cabang)})" ondblclick="filterCoachingByBranch(${toJsString(cabang)})">
+      <button class="hierarchy-item${coachingFilter.cabang === cabang ? ' active' : ''}" onclick='filterCoachingByBranch(${toJsString(cabang)})' ondblclick='filterCoachingByBranch(${toJsString(cabang)})'>
         <span>
           <strong>${escapeHtml(cabang)}</strong>
           <small>${map[cabang].total.toLocaleString('id-ID')} staff</small>
@@ -921,7 +921,7 @@
     const html = Object.keys(map)
       .sort((a, b) => (map[b].total - map[a].total) || a.localeCompare(b))
       .map(jab => `
-      <button class="hierarchy-item${coachingFilter.jabatan === jab ? ' active' : ''}" onclick="filterCoachingByJob(${toJsString(jab)})" ondblclick="filterCoachingByJob(${toJsString(jab)})">
+      <button class="hierarchy-item${coachingFilter.jabatan === jab ? ' active' : ''}" onclick='filterCoachingByJob(${toJsString(jab)})' ondblclick='filterCoachingByJob(${toJsString(jab)})'>
         <span>
           <strong>${escapeHtml(jab)}</strong>
           <small>${map[jab].total.toLocaleString('id-ID')} staff</small>
@@ -1027,9 +1027,9 @@
 
     const h = data.map(r => {
       const staffKey = `${r.nik}__${r.nama}`;
-      const activeClass = selectedCoachingStaffKey === staffKey ? 'coaching-row-active' : '';
+      const activeClass = selectedCoachingStaffKey === staffKey ? 'row-active' : '';
       return `
-      <tr class="${activeClass}" onclick="handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})" ondblclick="handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})">
+      <tr class="${activeClass}" onclick='handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})' ondblclick='handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})'>
         <td>${escapeHtml(r.nik)}</td>
         <td><b>${escapeHtml(r.nama)}</b></td>
         <td>${escapeHtml(r.region)}</td>
