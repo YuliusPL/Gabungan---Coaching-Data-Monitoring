@@ -10,7 +10,7 @@
   let coachingRows = [];
   let selectedCoachingStaffKey = '';
   let coachingLastFocus = { region: '', cabang: '', status: 'BELUM COACHING', staffKey: '' };
-  let coachingFilter = { level: 'all', region: '', cabang: '', status: 'BELUM COACHING' };
+  let coachingFilter = { level: 'all', region: '', cabang: '', jabatan: '', status: 'BELUM COACHING' };
   const coachingRegionBuckets = ['REGION 1', 'REGION 2', 'REGION 3', 'REGION 4', 'LAINNYA'];
   let currentPage = 'home';
 
@@ -921,13 +921,13 @@
     const html = Object.keys(map)
       .sort((a, b) => (map[b].total - map[a].total) || a.localeCompare(b))
       .map(jab => `
-      <div class="hierarchy-item hierarchy-item-static">
+      <button class="hierarchy-item${coachingFilter.jabatan === jab ? ' active' : ''}" onclick="filterCoachingByJob(${toJsString(jab)})" ondblclick="filterCoachingByJob(${toJsString(jab)})">
         <span>
           <strong>${escapeHtml(jab)}</strong>
           <small>${map[jab].total.toLocaleString('id-ID')} staff</small>
         </span>
         <span class="hierarchy-count">${map[jab].total.toLocaleString('id-ID')}</span>
-      </div>
+      </button>
     `).join('');
 
     box.innerHTML = html || '<div class="empty-state">Belum ada data jabatan belum coaching pada region ini.</div>';
@@ -965,14 +965,24 @@
 
   function filterCoachingByBranch(cabang) {
     coachingFilter.cabang = cabang;
+    coachingFilter.jabatan = '';
     if (!coachingFilter.status) coachingFilter.status = 'BELUM COACHING';
     coachingLastFocus = { region: coachingFilter.region, cabang: coachingFilter.cabang, status: coachingFilter.status, staffKey: selectedCoachingStaffKey };
     renderCoachingDashboard();
     sortCoachingInteractive(currentSort.col || 'nama', true);
   }
 
+  function filterCoachingByJob(jabatan) {
+    coachingFilter.jabatan = jabatan;
+    coachingFilter.cabang = '';
+    if (!coachingFilter.status) coachingFilter.status = 'BELUM COACHING';
+    coachingLastFocus = { region: coachingFilter.region, cabang: '', status: coachingFilter.status, staffKey: selectedCoachingStaffKey };
+    renderCoachingDashboard();
+    sortCoachingInteractive(currentSort.col || 'nama', true);
+  }
+
   function resetCoachingScope() {
-    coachingFilter = { level: 'all', region: '', cabang: '', status: 'BELUM COACHING' };
+    coachingFilter = { level: 'all', region: '', cabang: '', jabatan: '', status: 'BELUM COACHING' };
     selectedCoachingStaffKey = '';
     coachingLastFocus = { region: '', cabang: '', status: 'BELUM COACHING', staffKey: '' };
     const search = document.getElementById('coaching-search');
