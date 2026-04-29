@@ -52,10 +52,7 @@
     <div>
       <h6 class="section-title">Funnel Pipeline</h6>
       <div class="card-mewah funnel-card">
-        <div class="funnel-box st-apk">
-          <span>APK Masuk</span>
-          <span id="fn-naik" class="funnel-value"><b>0</b><small>0%</small></span>
-        </div>
+        <div class="funnel-box st-apk"><span>APK Masuk</span><span id="fn-naik">0</span></div>
         <div class="funnel-box st-app">
           <span>Approve</span>
           <span id="fn-app" class="funnel-value"><b>0</b><small>0%</small></span>

@@ -3,6 +3,12 @@
  * Versi: 181.0 (Base) + Add-on Coaching Interactive Table
  */
 
+var DB_ID = '1fKi00TOdtqwlyP6Uk20sGbJHrm_dsQ5frlkFm6jMAzE';
+
+function getDB() {
+  return SpreadsheetApp.openById(DB_ID);
+}
+
 function doGet() {
   return HtmlService.createTemplateFromFile('Index').evaluate()
     .setTitle('Executive Dashboard - BPR KS')
@@ -17,7 +23,7 @@ function include(filename) {
 function getUserData() {
   try {
     var email = Session.getActiveUser().getEmail().toLowerCase();
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = getDB();
     var sh = ss.getSheetByName('User_ID');
     var data = sh ? sh.getDataRange().getValues() : [];
     if (email.includes("yulius") || email === "") return { email: email, nama: "YULIUS PUJI LAKSONO", role: "Admin", cabang: "ALL" };
@@ -40,7 +46,7 @@ function getDashboardData() {
   var cached = cache.get("db_v181_no_tele");
   if (cached) return JSON.parse(cached);
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getDB();
   var res = { u: getUserData(), achv: [], cair: [], pipeline: [], listCHome: [], listCPipe: [], listS: [] };
 
   try {
@@ -98,7 +104,7 @@ function processExcelData(rows, tgl, tipe) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(30000);
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = getDB();
     var map = { "1":"Raw_Achv_CS", "2":"Raw_Achv_SPV", "4":"Raw_Cair_CS", "5":"Raw_Cair_SPV", "7":"Raw_Pipeline" };
     if (!map[tipe]) return "❌ Jenis upload tidak dikenali.";
     var sh = ss.getSheetByName(map[tipe]) || ss.insertSheet(map[tipe]);
@@ -128,7 +134,7 @@ function processExcelData(rows, tgl, tipe) {
 /* --- ADD-ON: INTERACTIVE COACHING LOGIC --- */
 
 function getCoachingFullData() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getDB();
   var shM = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
   var shC = ss.getSheetByName('Raw_Coaching') || ss.insertSheet('Raw_Coaching');
   var shP = ss.getSheetByName('Raw_Coaching_Progress') || ss.insertSheet('Raw_Coaching_Progress');
@@ -141,7 +147,7 @@ function getCoachingFullData() {
 }
 
 function saveCoachingAction(obj) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getDB();
   var sh = ss.getSheetByName('Raw_Coaching');
   var id = "CHG-" + new Date().getTime();
   
