@@ -447,11 +447,18 @@
     const safeValue = Number(value) || 0;
     const safeTotal = Number(total) || 0;
     const pct = safeTotal > 0 ? ((safeValue / safeTotal) * 100).toFixed(1) : '0.0';
+    let countEl = el.querySelector('.funnel-count');
+    let pctEl = el.querySelector('.funnel-pct');
 
-    el.innerHTML = `
-      <b>${safeValue.toLocaleString('id-ID')}</b>
-      <small>${pct}%</small>
-    `;
+    // Self-healing guard: if markup changes or gets replaced, rebuild stable funnel nodes.
+    if (!countEl || !pctEl) {
+      el.innerHTML = '<b class="funnel-count">0</b><small class="funnel-pct">0%</small>';
+      countEl = el.querySelector('.funnel-count');
+      pctEl = el.querySelector('.funnel-pct');
+    }
+
+    if (countEl) countEl.innerText = safeValue.toLocaleString('id-ID');
+    if (pctEl) pctEl.innerText = pct + '%';
   }
 
   function renderPipelineMixChart(productMix) {

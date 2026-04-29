@@ -55,19 +55,19 @@
         <div class="funnel-box st-apk"><span>APK Masuk</span><span id="fn-naik">0</span></div>
         <div class="funnel-box st-app">
           <span>Approve</span>
-          <span id="fn-app" class="funnel-value"><b>0</b><small>0%</small></span>
+          <span id="fn-app" class="funnel-value"><b class="funnel-count">0</b><small class="funnel-pct">0%</small></span>
         </div>
         <div class="funnel-box st-pen">
           <span>Pending</span>
-          <span id="fn-pen" class="funnel-value"><b>0</b><small>0%</small></span>
+          <span id="fn-pen" class="funnel-value"><b class="funnel-count">0</b><small class="funnel-pct">0%</small></span>
         </div>
         <div class="funnel-box st-rej">
           <span>Reject</span>
-          <span id="fn-rej" class="funnel-value"><b>0</b><small>0%</small></span>
+          <span id="fn-rej" class="funnel-value"><b class="funnel-count">0</b><small class="funnel-pct">0%</small></span>
         </div>
         <div class="funnel-box st-cair">
           <span>Cair</span>
-          <span id="fn-cair" class="funnel-value"><b>0</b><small>0%</small></span>
+          <span id="fn-cair" class="funnel-value"><b class="funnel-count">0</b><small class="funnel-pct">0%</small></span>
         </div>
       </div>
     </div>
