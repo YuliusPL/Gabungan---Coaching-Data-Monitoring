@@ -805,19 +805,6 @@
 
   function ensureCoachingBelumDefaultScope() {
     if (!coachingFilter.status) coachingFilter.status = 'BELUM COACHING';
-    if (coachingFilter.status !== 'BELUM COACHING' || coachingFilter.region) return;
-
-    const map = { 'REGION 1': 0, 'REGION 2': 0, 'REGION 3': 0, 'REGION 4': 0, 'LAINNYA': 0 };
-    (coachingRows || []).forEach(r => {
-      if (r.status !== 'BELUM COACHING') return;
-      const key = normalizeRegionLabel(r.region);
-      map[key] = (map[key] || 0) + 1;
-    });
-
-    const topRegion = [...coachingRegionBuckets]
-      .sort((a, b) => (map[b] || 0) - (map[a] || 0))[0];
-
-    if (topRegion && (map[topRegion] || 0) > 0) coachingFilter.region = topRegion;
   }
 
   function renderCoachingStats() {
@@ -860,12 +847,11 @@
     });
 
     const sorted = [...coachingRegionBuckets].sort((a, b) => (map[b] || 0) - (map[a] || 0));
-    const html = sorted.map((region, idx) => {
+    const html = sorted.map((region) => {
       const count = map[region] || 0;
       const active = coachingFilter.region === region ? ' active' : '';
       return `
         <button class="coaching-region-card${active}" onclick="filterCoachingByRegion(${toJsString(region)})">
-          <em class="coaching-region-rank">Top ${idx + 1}</em>
           <strong>${count.toLocaleString('id-ID')}</strong>
           <span>${escapeHtml(region)}</span>
           <small>Belum coaching</small>
@@ -1014,7 +1000,7 @@
     });
 
     const h = data.map(r => `
-      <tr onclick="handleRowClickCoaching(${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})">
+      <tr onclick="handleRowClickCoaching(${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})" ondblclick="handleRowClickCoaching(${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})">
         <td>${escapeHtml(r.nik)}</td>
         <td><b>${escapeHtml(r.nama)}</b></td>
         <td>${escapeHtml(r.region)}</td>
@@ -1055,7 +1041,22 @@
     }
 
     switchPage('coaching', true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const form = document.getElementById('coaching-form-section');
+    if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function startNewCoachingInput() {
+    setValue('c-parent-id', '');
+    setValue('c-staff', '');
+    setValue('c-cabang', '');
+    setValue('c-region', coachingFilter.region || '');
+    setValue('c-root', '');
+    setValue('c-topic', '');
+    setValue('c-target', '');
+    setValue('c-bm', '');
+    setValue('c-perf', '');
+    const form = document.getElementById('coaching-form-section');
+    if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function saveCoachingInteractive() {

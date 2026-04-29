@@ -16,7 +16,7 @@
       <b id="coaching-active-scope">Semua Region</b>
       <small id="coaching-active-subtitle">Klik kartu status, region, atau cabang untuk melihat detail.</small>
     </div>
-    <button class="btn btn-coaching-reset" onclick="resetCoachingScope()">
+    <button type="button" class="btn btn-coaching-reset" onclick="resetCoachingScope()">
       <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
     </button>
   </div>
@@ -113,6 +113,11 @@
       <div>
         <b>Detail Data Coaching</b>
         <small id="coaching-table-subtitle">Klik baris staff untuk mengisi form coaching.</small>
+      </div>
+      <div class="coaching-toolbar-actions">
+        <button type="button" class="btn btn-sm btn-coaching-quick" onclick="startNewCoachingInput()">
+          <i class="bi bi-plus-circle me-1"></i>Input Coaching Baru
+        </button>
       </div>
       <input
         type="text"

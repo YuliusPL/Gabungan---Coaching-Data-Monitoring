@@ -698,12 +698,15 @@
   }
 
   .coaching-region-card {
-    border: 1px solid rgba(15, 35, 60, 0.08);
-    border-radius: 16px;
+    border: 1px solid rgba(122, 79, 243, 0.18);
+    border-radius: 18px;
     padding: 14px;
-    background: rgba(255,255,255,0.86);
+    background:
+      radial-gradient(circle at 100% 0%, rgba(122,79,243,0.10), transparent 45%),
+      rgba(255,255,255,0.90);
     cursor: pointer;
     transition: all 0.18s ease;
+    box-shadow: 0 8px 18px rgba(15, 35, 60, 0.06);
   }
 
   .coaching-region-card:hover {
@@ -737,22 +740,11 @@
   }
 
   .coaching-region-card.active {
-    border-color: rgba(122, 79, 243, 0.38);
-    background: linear-gradient(135deg, rgba(122,79,243,0.14), rgba(255,255,255,0.95));
-  }
-
-  .coaching-region-rank {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    margin-bottom: 8px;
-    background: rgba(15, 61, 117, 0.10);
-    color: var(--primary);
-    font-size: 10px;
-    font-weight: 800;
+    border-color: rgba(122, 79, 243, 0.46);
+    background:
+      radial-gradient(circle at 100% 0%, rgba(122,79,243,0.18), transparent 45%),
+      rgba(255,255,255,0.96);
+    box-shadow: 0 12px 24px rgba(122, 79, 243, 0.18);
   }
 
   .coaching-status-card {
@@ -760,7 +752,7 @@
     overflow: hidden;
     border-left: 5px solid rgba(15, 35, 60, 0.22);
     cursor: pointer;
-    min-height: 112px;
+    min-height: 104px;
     transition: transform 0.18s ease, box-shadow 0.18s ease;
   }
 
@@ -841,6 +833,28 @@
 
   .hierarchy-item-static:hover {
     background: transparent;
+  }
+
+  .coaching-list-box {
+    max-height: 460px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .coaching-list-box::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .coaching-list-box::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(108, 125, 146, 0.45);
+  }
+
+  .coaching-monitor-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
   }
 
   .hierarchy-item strong {
@@ -1306,6 +1320,15 @@
   @media (min-width: 768px) {
     .coaching-region-card-grid {
       grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .coaching-monitor-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .coaching-list-box {
+      max-height: 520px;
     }
 
     body {
