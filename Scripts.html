@@ -8,7 +8,7 @@
   let currentSort = { col: 'nama', asc: true };
   let pipeSort = { col: 'debitur', asc: true };
   let coachingRows = [];
-  let coachingFilter = { level: 'all', region: '', cabang: '', status: '' };
+  let coachingFilter = { level: 'all', region: '', cabang: '', status: 'BELUM COACHING' };
   const coachingRegionBuckets = ['REGION 1', 'REGION 2', 'REGION 3', 'REGION 4', 'LAINNYA'];
   let currentPage = 'home';
 
@@ -787,7 +787,7 @@
 
   function getVisibleCoachingRows() {
     return (coachingRows || []).filter(r => {
-      const matchRegion = !coachingFilter.region || r.region === coachingFilter.region;
+      const matchRegion = !coachingFilter.region || normalizeRegionLabel(r.region) === coachingFilter.region;
       const matchCabang = !coachingFilter.cabang || r.cab === coachingFilter.cabang;
       const matchStatus = !coachingFilter.status || r.status === coachingFilter.status;
       return matchRegion && matchCabang && matchStatus;
@@ -795,11 +795,29 @@
   }
 
   function renderCoachingDashboard() {
+    ensureCoachingBelumDefaultScope();
     renderCoachingStats();
     renderCoachingRegionCards();
     renderCoachingBranchList();
     renderCoachingJobList();
     updateCoachingScopeText();
+  }
+
+  function ensureCoachingBelumDefaultScope() {
+    if (!coachingFilter.status) coachingFilter.status = 'BELUM COACHING';
+    if (coachingFilter.status !== 'BELUM COACHING' || coachingFilter.region) return;
+
+    const map = { 'REGION 1': 0, 'REGION 2': 0, 'REGION 3': 0, 'REGION 4': 0, 'LAINNYA': 0 };
+    (coachingRows || []).forEach(r => {
+      if (r.status !== 'BELUM COACHING') return;
+      const key = normalizeRegionLabel(r.region);
+      map[key] = (map[key] || 0) + 1;
+    });
+
+    const topRegion = [...coachingRegionBuckets]
+      .sort((a, b) => (map[b] || 0) - (map[a] || 0))[0];
+
+    if (topRegion && (map[topRegion] || 0) > 0) coachingFilter.region = topRegion;
   }
 
   function renderCoachingStats() {
@@ -842,11 +860,12 @@
     });
 
     const sorted = [...coachingRegionBuckets].sort((a, b) => (map[b] || 0) - (map[a] || 0));
-    const html = sorted.map(region => {
+    const html = sorted.map((region, idx) => {
       const count = map[region] || 0;
       const active = coachingFilter.region === region ? ' active' : '';
       return `
         <button class="coaching-region-card${active}" onclick="filterCoachingByRegion(${toJsString(region)})">
+          <em class="coaching-region-rank">Top ${idx + 1}</em>
           <strong>${count.toLocaleString('id-ID')}</strong>
           <span>${escapeHtml(region)}</span>
           <small>Belum coaching</small>
@@ -918,10 +937,10 @@
   }
 
   function updateCoachingScopeText() {
-    let title = 'Semua Region - BELUM COACHING';
-    if (coachingFilter.region) title = coachingFilter.region + ' - BELUM COACHING';
-    if (coachingFilter.cabang) title = coachingFilter.cabang;
-    if (coachingFilter.status) title += ' - ' + coachingFilter.status;
+    const statusText = coachingFilter.status || 'BELUM COACHING';
+    let title = coachingFilter.region ? coachingFilter.region : 'Semua Region';
+    if (coachingFilter.cabang) title += ' / ' + coachingFilter.cabang;
+    title += ' - ' + statusText;
 
     setText('coaching-active-scope', title);
     setText('coaching-active-subtitle', `${getVisibleCoachingRows().length.toLocaleString('id-ID')} staff tampil di tabel detail.`);
@@ -929,6 +948,10 @@
 
   function filterCoachingByStatus(status) {
     coachingFilter.status = status;
+    if (status !== 'BELUM COACHING') {
+      coachingFilter.region = '';
+      coachingFilter.cabang = '';
+    }
     renderCoachingDashboard();
     sortCoachingInteractive(currentSort.col || 'nama', true);
   }
@@ -943,12 +966,13 @@
 
   function filterCoachingByBranch(cabang) {
     coachingFilter.cabang = cabang;
+    if (!coachingFilter.status) coachingFilter.status = 'BELUM COACHING';
     renderCoachingDashboard();
     sortCoachingInteractive(currentSort.col || 'nama', true);
   }
 
   function resetCoachingScope() {
-    coachingFilter = { level: 'all', region: '', cabang: '', status: '' };
+    coachingFilter = { level: 'all', region: '', cabang: '', status: 'BELUM COACHING' };
     const search = document.getElementById('coaching-search');
     if (search) search.value = '';
     renderCoachingDashboard();

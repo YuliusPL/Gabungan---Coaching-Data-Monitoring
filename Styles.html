@@ -741,6 +741,20 @@
     background: linear-gradient(135deg, rgba(122,79,243,0.14), rgba(255,255,255,0.95));
   }
 
+  .coaching-region-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+    background: rgba(15, 61, 117, 0.10);
+    color: var(--primary);
+    font-size: 10px;
+    font-weight: 800;
+  }
+
   .coaching-status-card {
     position: relative;
     overflow: hidden;
@@ -815,6 +829,18 @@
 
   .hierarchy-item:hover {
     background: rgba(122, 79, 243, 0.06);
+  }
+
+  .hierarchy-item.active {
+    background: rgba(122, 79, 243, 0.12);
+  }
+
+  .hierarchy-item-static {
+    cursor: default;
+  }
+
+  .hierarchy-item-static:hover {
+    background: transparent;
   }
 
   .hierarchy-item strong {
