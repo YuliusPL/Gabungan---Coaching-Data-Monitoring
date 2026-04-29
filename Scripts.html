@@ -745,12 +745,18 @@
       const latest = coachData[0] || null;
       const status = getCoachingStatus(latest);
 
+      const normalized = normalizeStaffPlacement(
+        String(m[idxJab] || '').trim(),
+        String(m[idxRegion] || '').trim(),
+        String(m[idxCab] || '').trim()
+      );
+
       rows.push({
         nik: String(m[idxNik] || '').trim(),
         nama,
-        jab: String(m[idxJab] || '').trim(),
-        region: String(m[idxRegion] || 'REGION LAINNYA').trim() || 'REGION LAINNYA',
-        cab: String(m[idxCab] || '').trim(),
+        jab: normalized.jab,
+        region: normalized.region,
+        cab: normalized.cab,
         role: String(m[idxRole] || '').trim(),
         status,
         lastId: latest ? String(latest[0] || '') : '',
@@ -760,6 +766,31 @@
     });
 
     return rows;
+  }
+
+  function isLikelyRegionLabel(value) {
+    const v = String(value || '').toUpperCase().trim();
+    if (!v) return false;
+    return v.includes('REGION') || v.includes('AREA') || v.includes('WILAYAH') || v.includes('KANWIL');
+  }
+
+  function normalizeStaffPlacement(jabRaw, regionRaw, cabRaw) {
+    let jab = String(jabRaw || '').trim();
+    let region = String(regionRaw || '').trim();
+    const cab = String(cabRaw || '').trim();
+
+    // If source columns are swapped, recover by semantic detection.
+    if (!isLikelyRegionLabel(region) && isLikelyRegionLabel(jab)) {
+      const tmp = jab;
+      jab = region;
+      region = tmp;
+    }
+
+    return {
+      jab: jab || 'JABATAN LAINNYA',
+      region: region || 'LAINNYA',
+      cab
+    };
   }
 
   function getCoachingStatus(latest) {
@@ -979,9 +1010,8 @@
 
   function filterCoachingByJob(jabatan) {
     coachingFilter.jabatan = jabatan;
-    coachingFilter.cabang = '';
     if (!coachingFilter.status) coachingFilter.status = 'BELUM COACHING';
-    coachingLastFocus = { region: coachingFilter.region, cabang: '', status: coachingFilter.status, staffKey: selectedCoachingStaffKey };
+    coachingLastFocus = { region: coachingFilter.region, cabang: coachingFilter.cabang, status: coachingFilter.status, staffKey: selectedCoachingStaffKey };
     renderCoachingDashboard();
     sortCoachingInteractive(currentSort.col || 'nama', true);
   }
@@ -1034,7 +1064,7 @@
       const staffKey = `${r.nik}__${r.nama}`;
       const activeClass = selectedCoachingStaffKey === staffKey ? 'row-active' : '';
       return `
-      <tr class="${activeClass}" onclick='handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})' ondblclick='handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)})'>
+      <tr class="${activeClass}" onclick='handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)}, ${toJsString(r.jab)})' ondblclick='handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)}, ${toJsString(r.jab)})'>
         <td>${escapeHtml(r.nik)}</td>
         <td><b>${escapeHtml(r.nama)}</b></td>
         <td>${escapeHtml(r.region)}</td>
@@ -1061,11 +1091,12 @@
     return 'badge-on-progress';
   }
 
-  function handleRowClickCoaching(nik, nama, cab, lastId, region) {
+  function handleRowClickCoaching(nik, nama, cab, lastId, region, jabatan) {
     selectedCoachingStaffKey = `${nik}__${nama}`;
     coachingLastFocus = { region: coachingFilter.region, cabang: coachingFilter.cabang, status: coachingFilter.status || 'BELUM COACHING', staffKey: selectedCoachingStaffKey };
     setValue('c-staff', nama || '');
     setValue('c-cabang', cab || '');
+    setValue('c-jabatan', jabatan || '');
     setValue('c-parent-id', lastId || '');
     setValue('c-region', region || '');
     clearCoachingFieldErrors();
@@ -1088,6 +1119,7 @@
     setValue('c-parent-id', '');
     setValue('c-staff', '');
     setValue('c-cabang', '');
+    setValue('c-jabatan', '');
     setValue('c-region', coachingFilter.region || '');
     setValue('c-root', '');
     setValue('c-topic', '');
@@ -1100,7 +1132,7 @@
   }
 
   function clearCoachingFieldErrors() {
-    ['c-staff', 'c-cabang', 'c-region', 'c-root', 'c-topic', 'c-target'].forEach(id => {
+    ['c-staff', 'c-cabang', 'c-jabatan', 'c-region', 'c-root', 'c-topic', 'c-target'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('input-error');
     });
@@ -1110,6 +1142,7 @@
     const required = [
       { id: 'c-staff', value: obj.staff, label: 'Nama Staff' },
       { id: 'c-cabang', value: obj.cabang, label: 'Cabang' },
+      { id: 'c-jabatan', value: obj.jabatan, label: 'Jabatan' },
       { id: 'c-region', value: obj.region, label: 'Region' },
       { id: 'c-root', value: obj.root, label: 'Root Cause' },
       { id: 'c-topic', value: obj.topic, label: 'Topic Coaching' },
@@ -1135,6 +1168,7 @@
       target: getValue('c-target'),
       parentId: getValue('c-parent-id'),
       bm: getValue('c-bm'),
+      jabatan: getValue('c-jabatan'),
       region: getValue('c-region'),
       lastPerf: getValue('c-perf')
     };
@@ -1170,7 +1204,7 @@
   }
 
   function clearCoachingForm() {
-    ['c-staff', 'c-cabang', 'c-root', 'c-topic', 'c-target', 'c-parent-id', 'c-bm', 'c-region', 'c-perf']
+    ['c-staff', 'c-cabang', 'c-jabatan', 'c-root', 'c-topic', 'c-target', 'c-parent-id', 'c-bm', 'c-region', 'c-perf']
       .forEach(id => setValue(id, ''));
   }
 
