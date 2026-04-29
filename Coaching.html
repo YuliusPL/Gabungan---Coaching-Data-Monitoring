@@ -14,7 +14,7 @@
     <div class="active-scope-card">
       <span class="eyebrow">Scope Aktif</span>
       <b id="coaching-active-scope">Semua Region</b>
-      <small id="coaching-active-subtitle">Klik kartu status, region, atau cabang untuk melihat detail.</small>
+      <small id="coaching-active-subtitle">Klik kartu status, region, cabang, atau jabatan untuk melihat detail.</small>
     </div>
     <button type="button" class="btn btn-coaching-reset" onclick="resetCoachingScope()">
       <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
@@ -112,7 +112,7 @@
     <div class="table-toolbar">
       <div>
         <b>Detail Data Coaching</b>
-        <small id="coaching-table-subtitle">Klik baris staff untuk mengisi form coaching.</small>
+        <small id="coaching-table-subtitle">Double klik baris staff untuk mengisi form coaching.</small>
       </div>
       <div class="coaching-toolbar-actions">
         <button type="button" class="btn btn-sm btn-coaching-quick" onclick="startNewCoachingInput()">
@@ -132,7 +132,7 @@
       <table class="table table-sm table-hover mb-0 sticky-table-head data-table coaching-detail-table">
         <thead>
           <tr>
-            <th onclick="sortCoachingInteractive('nik')">NIK</th>
+            <th onclick="sortCoachingInteractive('nik')">NIK / NPK</th>
             <th onclick="sortCoachingInteractive('nama')">NAMA</th>
             <th onclick="sortCoachingInteractive('region')">REGION</th>
             <th onclick="sortCoachingInteractive('cab')">CABANG</th>
@@ -160,11 +160,27 @@
     </div>
 
     <input type="hidden" id="c-parent-id">
+    <input type="hidden" id="c-row-mode" value="new">
 
     <div class="form-grid">
-      <div class="form-group span-2">
+      <div class="form-group">
+        <label class="form-label-lite">NIK / NPK</label>
+        <input type="text" id="c-nik" class="form-control" placeholder="NIK / NPK staff">
+      </div>
+
+      <div class="form-group">
         <label class="form-label-lite">Nama Staff</label>
         <input type="text" id="c-staff" class="form-control" placeholder="Pilih dari tabel atau isi manual">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label-lite">Jabatan</label>
+        <input type="text" id="c-jabatan" class="form-control" placeholder="Jabatan">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label-lite">BM / RH</label>
+        <input type="text" id="c-bm" class="form-control" placeholder="Auto dari cabang (tetap bisa diedit)">
       </div>
 
       <div class="form-group">
@@ -173,28 +189,13 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label-lite">Last Performance</label>
-        <input type="text" id="c-perf" class="form-control" placeholder="Contoh: Ach 65%">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label-lite">BM</label>
-        <input type="text" id="c-bm" class="form-control" placeholder="Nama BM">
-      </div>
-
-      <div class="form-group">
         <label class="form-label-lite">Region</label>
         <input type="text" id="c-region" class="form-control" placeholder="Region">
       </div>
 
-      <div class="form-group">
-        <label class="form-label-lite">Jabatan</label>
-        <input type="text" id="c-jabatan" class="form-control" placeholder="Jabatan">
-      </div>
-
       <div class="form-group span-2">
         <label class="form-label-lite">Root Cause</label>
-        <textarea id="c-root" class="form-control" rows="4" placeholder="Tuliskan akar masalah yang perlu ditindaklanjuti"></textarea>
+        <textarea id="c-root" class="form-control" rows="3" placeholder="Tuliskan akar masalah yang perlu ditindaklanjuti"></textarea>
       </div>
 
       <div class="form-group span-2">
@@ -204,7 +205,35 @@
 
       <div class="form-group span-2">
         <label class="form-label-lite">Target / Action Plan</label>
-        <textarea id="c-target" class="form-control" rows="4" placeholder="Target perbaikan, komitmen, dan rencana tindak lanjut"></textarea>
+        <textarea id="c-target" class="form-control" rows="3" placeholder="Target perbaikan, komitmen, dan rencana tindak lanjut"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label-lite">Satuan Target</label>
+        <select id="c-satuan" class="form-select">
+          <option value="">Pilih satuan target</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label-lite">Target Date</label>
+        <input type="date" id="c-target-date" class="form-control">
+      </div>
+
+      <div class="form-group span-2">
+        <label class="form-label-lite">How (it Will Be Done)</label>
+        <textarea id="c-how" class="form-control" rows="3" placeholder="Bagaimana target akan dicapai"></textarea>
+      </div>
+
+      <div id="coaching-followup-fields" class="span-2" style="display:none;">
+        <div class="form-group span-2">
+          <label class="form-label-lite">Result</label>
+          <textarea id="c-result" class="form-control" rows="3" placeholder="Hasil eksekusi coaching sebelumnya"></textarea>
+        </div>
+        <div class="form-group span-2">
+          <label class="form-label-lite">Feedback</label>
+          <textarea id="c-feedback" class="form-control" rows="3" placeholder="Feedback untuk perbaikan berikutnya"></textarea>
+        </div>
       </div>
 
       <button class="btn btn-coaching span-2" onclick="saveCoachingInteractive()">

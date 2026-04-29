@@ -8,6 +8,9 @@
   let currentSort = { col: 'nama', asc: true };
   let pipeSort = { col: 'debitur', asc: true };
   let coachingRows = [];
+  let coachingRegionByBranch = {};
+  let coachingLeaderByBranch = {};
+  let coachingSatuanOptions = [];
   let selectedCoachingStaffKey = '';
   let coachingLastFocus = { region: '', cabang: '', status: 'BELUM COACHING', staffKey: '' };
   let coachingFilter = { level: 'all', region: '', cabang: '', jabatan: '', status: 'BELUM COACHING' };
@@ -677,13 +680,45 @@
   function fetchCoachingAddon() {
     google.script.run
       .withSuccessHandler(res => {
-        dbCoaching = res || { master: [], coaching: [], progress: [] };
+        dbCoaching = res || { master: [], coaching: [], progress: [], regionMap: [], satuan: [] };
+        prepareCoachingReferenceData();
         renderCoachingInteractiveTable();
       })
       .withFailureHandler(err => {
         console.error(err);
       })
       .getCoachingFullData();
+  }
+
+  function prepareCoachingReferenceData() {
+    coachingRegionByBranch = {};
+    coachingLeaderByBranch = {};
+    coachingSatuanOptions = [];
+
+    const regionRows = dbCoaching.regionMap || [];
+    if (regionRows.length > 1) {
+      const hdr = regionRows[0];
+      const idxCab = getHeaderIndex(hdr, ['cabang', 'branch'], 0);
+      const idxRegion = getHeaderIndex(hdr, ['region', 'wilayah', 'area'], 1);
+      const idxBm = getHeaderIndex(hdr, ['bm', 'branch manager', 'nama bm', 'rh', 'region head'], 2);
+      regionRows.slice(1).forEach(r => {
+        const cab = String(r[idxCab] || '').trim().toUpperCase();
+        if (!cab) return;
+        const region = normalizeRegionText(r[idxRegion] || '');
+        const bm = String(r[idxBm] || '').trim();
+        if (region) coachingRegionByBranch[cab] = region;
+        if (bm) coachingLeaderByBranch[cab] = bm;
+      });
+    }
+
+    const satuanRows = dbCoaching.satuan || [];
+    if (satuanRows.length > 0) {
+      const startIdx = satuanRows.length > 1 ? 1 : 0;
+      const opts = satuanRows.slice(startIdx)
+        .map(r => String((r && r[0]) || '').trim())
+        .filter(Boolean);
+      coachingSatuanOptions = [...new Set(opts)];
+    }
   }
 
   function getHeaderIndex(headers, candidates, fallback) {
@@ -708,6 +743,7 @@
     }
 
     coachingRows = buildCoachingRows();
+    populateSatuanOptions();
     window.dataTabelCoaching = coachingRows;
     applyCoachingLastFocus();
     renderCoachingDashboard();
@@ -755,8 +791,9 @@
         nik: String(m[idxNik] || '').trim(),
         nama,
         jab: normalized.jab,
-        region: normalized.region,
+        region: resolveRegionByBranch(normalized.cab, normalized.region),
         cab: normalized.cab,
+        bm: resolveBmByBranch(normalized.cab, ''),
         role: String(m[idxRole] || '').trim(),
         status,
         lastId: latest ? String(latest[0] || '') : '',
@@ -788,9 +825,49 @@
 
     return {
       jab: jab || 'JABATAN LAINNYA',
-      region: region || 'LAINNYA',
+      region: normalizeRegionText(region || ''),
       cab
     };
+  }
+
+  function normalizeRegionText(value) {
+    const raw = String(value || '').trim().toUpperCase();
+    if (!raw) return '';
+    if (raw.includes('REGION 1') || /\bR1\b/.test(raw)) return 'REGION 1';
+    if (raw.includes('REGION 2') || /\bR2\b/.test(raw)) return 'REGION 2';
+    if (raw.includes('REGION 3') || /\bR3\b/.test(raw)) return 'REGION 3';
+    if (raw.includes('REGION 4') || /\bR4\b/.test(raw)) return 'REGION 4';
+    if (raw.includes('LAIN')) return 'LAINNYA';
+    return raw;
+  }
+
+  function resolveRegionByBranch(cabang, fallbackRegion) {
+    const key = String(cabang || '').trim().toUpperCase();
+    if (key && coachingRegionByBranch[key]) return coachingRegionByBranch[key];
+    return normalizeRegionText(fallbackRegion || '') || 'LAINNYA';
+  }
+
+  function resolveBmByBranch(cabang, fallbackBm) {
+    const key = String(cabang || '').trim().toUpperCase();
+    if (key && coachingLeaderByBranch[key]) return coachingLeaderByBranch[key];
+    return String(fallbackBm || '').trim();
+  }
+
+  function populateSatuanOptions() {
+    const select = document.getElementById('c-satuan');
+    if (!select) return;
+    const current = select.value;
+    const options = coachingSatuanOptions && coachingSatuanOptions.length
+      ? coachingSatuanOptions
+      : ['Unit', 'Nasabah', 'Miliar', 'Juta', 'Persen', 'Dokumen'];
+    select.innerHTML = '<option value="">Pilih satuan target</option>' +
+      options.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+    if (current && options.includes(current)) select.value = current;
+  }
+
+  function toggleFollowUpFields(isFollowUp) {
+    const wrap = document.getElementById('coaching-followup-fields');
+    if (wrap) wrap.style.display = isFollowUp ? 'block' : 'none';
   }
 
   function getCoachingStatus(latest) {
@@ -1064,7 +1141,7 @@
       const staffKey = `${r.nik}__${r.nama}`;
       const activeClass = selectedCoachingStaffKey === staffKey ? 'row-active' : '';
       return `
-      <tr class="${activeClass}" onclick='handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)}, ${toJsString(r.jab)})' ondblclick='handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)}, ${toJsString(r.jab)})'>
+      <tr class="${activeClass}" onclick='handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)}, ${toJsString(r.jab)}, ${toJsString(r.bm)}, ${toJsString(r.status)})' ondblclick='handleRowClickCoaching(${toJsString(r.nik)}, ${toJsString(r.nama)}, ${toJsString(r.cab)}, ${toJsString(r.lastId)}, ${toJsString(r.region)}, ${toJsString(r.jab)}, ${toJsString(r.bm)}, ${toJsString(r.status)})'>
         <td>${escapeHtml(r.nik)}</td>
         <td><b>${escapeHtml(r.nama)}</b></td>
         <td>${escapeHtml(r.region)}</td>
@@ -1091,14 +1168,20 @@
     return 'badge-on-progress';
   }
 
-  function handleRowClickCoaching(nik, nama, cab, lastId, region, jabatan) {
+  function handleRowClickCoaching(nik, nama, cab, lastId, region, jabatan, bm, status) {
     selectedCoachingStaffKey = `${nik}__${nama}`;
     coachingLastFocus = { region: coachingFilter.region, cabang: coachingFilter.cabang, status: coachingFilter.status || 'BELUM COACHING', staffKey: selectedCoachingStaffKey };
+    clearCoachingForm();
+    setValue('c-nik', nik || '');
     setValue('c-staff', nama || '');
     setValue('c-cabang', cab || '');
     setValue('c-jabatan', jabatan || '');
     setValue('c-parent-id', lastId || '');
-    setValue('c-region', region || '');
+    setValue('c-region', resolveRegionByBranch(cab, region));
+    setValue('c-bm', resolveBmByBranch(cab, bm));
+    const isFollowUp = !!lastId || String(status || '').toUpperCase() !== 'BELUM COACHING';
+    setValue('c-row-mode', isFollowUp ? 'followup' : 'new');
+    toggleFollowUpFields(isFollowUp);
     clearCoachingFieldErrors();
 
     if (lastId) {
@@ -1116,23 +1199,16 @@
 
   function startNewCoachingInput() {
     selectedCoachingStaffKey = '';
-    setValue('c-parent-id', '');
-    setValue('c-staff', '');
-    setValue('c-cabang', '');
-    setValue('c-jabatan', '');
-    setValue('c-region', coachingFilter.region || '');
-    setValue('c-root', '');
-    setValue('c-topic', '');
-    setValue('c-target', '');
-    setValue('c-bm', '');
-    setValue('c-perf', '');
+    clearCoachingForm();
+    setValue('c-row-mode', 'new');
+    toggleFollowUpFields(false);
     clearCoachingFieldErrors();
     const form = document.getElementById('coaching-form-section');
     if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function clearCoachingFieldErrors() {
-    ['c-staff', 'c-cabang', 'c-jabatan', 'c-region', 'c-root', 'c-topic', 'c-target'].forEach(id => {
+    ['c-nik', 'c-staff', 'c-cabang', 'c-jabatan', 'c-region', 'c-root', 'c-topic', 'c-target', 'c-satuan', 'c-target-date', 'c-how'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('input-error');
     });
@@ -1140,13 +1216,17 @@
 
   function validateCoachingForm(obj) {
     const required = [
+      { id: 'c-nik', value: obj.nik, label: 'NIK / NPK' },
       { id: 'c-staff', value: obj.staff, label: 'Nama Staff' },
       { id: 'c-cabang', value: obj.cabang, label: 'Cabang' },
       { id: 'c-jabatan', value: obj.jabatan, label: 'Jabatan' },
       { id: 'c-region', value: obj.region, label: 'Region' },
       { id: 'c-root', value: obj.root, label: 'Root Cause' },
       { id: 'c-topic', value: obj.topic, label: 'Topic Coaching' },
-      { id: 'c-target', value: obj.target, label: 'Target / Action Plan' }
+      { id: 'c-target', value: obj.target, label: 'Target / Action Plan' },
+      { id: 'c-satuan', value: obj.satuanTarget, label: 'Satuan Target' },
+      { id: 'c-target-date', value: obj.targetDate, label: 'Target Date' },
+      { id: 'c-how', value: obj.how, label: 'How (it Will Be Done)' }
     ];
 
     clearCoachingFieldErrors();
@@ -1161,6 +1241,7 @@
 
   function saveCoachingInteractive() {
     const obj = {
+      nik: getValue('c-nik'),
       cabang: getValue('c-cabang'),
       staff: getValue('c-staff'),
       root: getValue('c-root'),
@@ -1170,7 +1251,13 @@
       bm: getValue('c-bm'),
       jabatan: getValue('c-jabatan'),
       region: getValue('c-region'),
-      lastPerf: getValue('c-perf')
+      lastPerf: getValue('c-perf'),
+      satuanTarget: getValue('c-satuan'),
+      targetDate: getValue('c-target-date'),
+      how: getValue('c-how'),
+      result: getValue('c-result'),
+      feedback: getValue('c-feedback'),
+      status: getValue('c-row-mode') === 'followup' ? 'NEED FU' : 'ONGOING'
     };
 
     const missing = validateCoachingForm(obj);
@@ -1204,8 +1291,10 @@
   }
 
   function clearCoachingForm() {
-    ['c-staff', 'c-cabang', 'c-jabatan', 'c-root', 'c-topic', 'c-target', 'c-parent-id', 'c-bm', 'c-region', 'c-perf']
+    ['c-nik', 'c-staff', 'c-cabang', 'c-jabatan', 'c-root', 'c-topic', 'c-target', 'c-parent-id', 'c-bm', 'c-region', 'c-perf', 'c-satuan', 'c-target-date', 'c-how', 'c-result', 'c-feedback']
       .forEach(id => setValue(id, ''));
+    setValue('c-row-mode', 'new');
+    toggleFollowUpFields(false);
   }
 
   function debounceSearch() {

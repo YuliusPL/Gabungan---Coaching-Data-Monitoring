@@ -138,33 +138,69 @@ function getCoachingFullData() {
   var shM = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
   var shC = ss.getSheetByName('Raw_Coaching') || ss.insertSheet('Raw_Coaching');
   var shP = ss.getSheetByName('Raw_Coaching_Progress') || ss.insertSheet('Raw_Coaching_Progress');
+  var shR = ss.getSheetByName('DB_Region') || ss.getSheetByName('MASTER_REGION');
+  var shS = ss.getSheetByName('MASTER_SATUAN');
   
   return {
     master: shM ? shM.getDataRange().getValues() : [],
     coaching: shC.getDataRange().getValues(),
-    progress: shP.getDataRange().getValues()
+    progress: shP.getDataRange().getValues(),
+    regionMap: shR ? shR.getDataRange().getValues() : [],
+    satuan: shS ? shS.getDataRange().getValues() : []
   };
 }
 
 function saveCoachingAction(obj) {
   var ss = getDB();
-  var sh = ss.getSheetByName('Raw_Coaching');
+  var sh = ss.getSheetByName('Raw_Coaching') || ss.insertSheet('Raw_Coaching');
   var id = "CHG-" + new Date().getTime();
-  
-  // Header: ID, Tanggal, Cabang, Nama, Root, Topic, Target, Status, ParentID, BM, Region, LastPerf
+
+  var header = [
+    "ID",
+    "Tanggal",
+    "Cabang",
+    "Nama",
+    "Root Cause",
+    "Topic",
+    "Target",
+    "Status",
+    "ParentID",
+    "BM/RH",
+    "Region",
+    "LastPerf",
+    "NIK",
+    "Jabatan",
+    "Satuan Target",
+    "Target Date",
+    "How",
+    "Result",
+    "Feedback"
+  ];
+
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(header);
+  }
+
   sh.appendRow([
-    id, 
-    new Date(), 
-    obj.cabang, 
-    obj.staff, 
-    obj.root, 
-    obj.topic, 
-    obj.target, 
-    "ONGOING", 
-    obj.parentId || "", 
-    obj.bm || "", 
-    obj.region || "", 
-    obj.lastPerf || ""
+    id,
+    new Date(),
+    obj.cabang || "",
+    obj.staff || "",
+    obj.root || "",
+    obj.topic || "",
+    obj.target || "",
+    obj.status || "ONGOING",
+    obj.parentId || "",
+    obj.bm || "",
+    obj.region || "",
+    obj.lastPerf || "",
+    obj.nik || "",
+    obj.jabatan || "",
+    obj.satuanTarget || "",
+    obj.targetDate || "",
+    obj.how || "",
+    obj.result || "",
+    obj.feedback || ""
   ]);
   return "Berhasil";
 }
