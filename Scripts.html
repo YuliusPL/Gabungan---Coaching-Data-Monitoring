@@ -413,6 +413,7 @@
     setFunnelValue('fn-pen', metrics.pen, metrics.apk);
     setFunnelValue('fn-rej', metrics.rej, metrics.apk);
     setFunnelValue('fn-cair', metrics.cair, metrics.apk);
+    ensurePipelineFunnelStructure();
 
     [1, 2, 3, 4].forEach(i => {
       setText('ag-' + i, metrics.ag[i - 1].toLocaleString('id-ID'));
@@ -438,6 +439,19 @@
     if (bot) bot.innerHTML = botHtml || emptyMessage;
 
     renderPipelineMixChart(productMix);
+  }
+
+  function ensurePipelineFunnelStructure() {
+    ['fn-app', 'fn-pen', 'fn-rej', 'fn-cair'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const countEl = el.querySelector('.funnel-count');
+      const pctEl = el.querySelector('.funnel-pct');
+      if (!countEl || !pctEl) {
+        console.warn('Pipeline funnel structure repaired for:', id);
+        el.innerHTML = '<b class="funnel-count">0</b><small class="funnel-pct">0%</small>';
+      }
+    });
   }
 
   function setFunnelValue(id, value, total) {
