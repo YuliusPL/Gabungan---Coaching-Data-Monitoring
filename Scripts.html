@@ -800,8 +800,9 @@
     return (coachingRows || []).filter(r => {
       const matchRegion = !coachingFilter.region || normalizeRegionLabel(r.region) === coachingFilter.region;
       const matchCabang = !coachingFilter.cabang || r.cab === coachingFilter.cabang;
+      const matchJabatan = !coachingFilter.jabatan || r.jab === coachingFilter.jabatan;
       const matchStatus = !coachingFilter.status || r.status === coachingFilter.status;
-      return matchRegion && matchCabang && matchStatus;
+      return matchRegion && matchCabang && matchJabatan && matchStatus;
     });
   }
 
@@ -909,7 +910,8 @@
 
     const rows = (coachingRows || []).filter(r =>
       r.status === 'BELUM COACHING' &&
-      (!coachingFilter.region || normalizeRegionLabel(r.region) === coachingFilter.region)
+      (!coachingFilter.region || normalizeRegionLabel(r.region) === coachingFilter.region) &&
+      (!coachingFilter.cabang || r.cab === coachingFilter.cabang)
     );
     const map = {};
     rows.forEach(r => {
@@ -937,6 +939,7 @@
     const statusText = coachingFilter.status || 'BELUM COACHING';
     let title = coachingFilter.region ? coachingFilter.region : 'Semua Region';
     if (coachingFilter.cabang) title += ' / ' + coachingFilter.cabang;
+    if (coachingFilter.jabatan) title += ' / ' + coachingFilter.jabatan;
     title += ' - ' + statusText;
 
     setText('coaching-active-scope', title);
@@ -948,6 +951,7 @@
     if (status !== 'BELUM COACHING') {
       coachingFilter.region = '';
       coachingFilter.cabang = '';
+      coachingFilter.jabatan = '';
     }
     coachingLastFocus = { region: coachingFilter.region, cabang: coachingFilter.cabang, status: coachingFilter.status, staffKey: selectedCoachingStaffKey };
     renderCoachingDashboard();
@@ -957,6 +961,7 @@
   function filterCoachingByRegion(region) {
     coachingFilter.region = region;
     coachingFilter.cabang = '';
+    coachingFilter.jabatan = '';
     coachingFilter.status = 'BELUM COACHING';
     coachingLastFocus = { region: coachingFilter.region, cabang: '', status: coachingFilter.status, staffKey: selectedCoachingStaffKey };
     renderCoachingDashboard();
