@@ -690,6 +690,57 @@
     margin-bottom: 14px;
   }
 
+  .coaching-region-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .coaching-region-card {
+    border: 1px solid rgba(15, 35, 60, 0.08);
+    border-radius: 16px;
+    padding: 14px;
+    background: rgba(255,255,255,0.86);
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .coaching-region-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-card);
+  }
+
+  .coaching-region-card strong {
+    display: block;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1.1;
+  }
+
+  .coaching-region-card span {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-main);
+    text-transform: uppercase;
+  }
+
+  .coaching-region-card small {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-soft);
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .coaching-region-card.active {
+    border-color: rgba(122, 79, 243, 0.38);
+    background: linear-gradient(135deg, rgba(122,79,243,0.14), rgba(255,255,255,0.95));
+  }
+
   .coaching-status-card {
     position: relative;
     overflow: hidden;
@@ -1227,6 +1278,10 @@
   }
 
   @media (min-width: 768px) {
+    .coaching-region-card-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
     body {
       padding-bottom: 118px;
       font-size: 14px;

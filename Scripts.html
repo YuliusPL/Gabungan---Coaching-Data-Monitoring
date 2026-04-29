@@ -9,6 +9,7 @@
   let pipeSort = { col: 'debitur', asc: true };
   let coachingRows = [];
   let coachingFilter = { level: 'all', region: '', cabang: '', status: '' };
+  const coachingRegionBuckets = ['REGION 1', 'REGION 2', 'REGION 3', 'REGION 4', 'LAINNYA'];
   let currentPage = 'home';
 
   const pageOrder = ['home', 'pipe', 'coaching', 'admin'];
@@ -774,6 +775,16 @@
     return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
+  function normalizeRegionLabel(region) {
+    const raw = String(region || '').trim().toUpperCase();
+    if (!raw) return 'LAINNYA';
+    if (raw.includes('REGION 1')) return 'REGION 1';
+    if (raw.includes('REGION 2')) return 'REGION 2';
+    if (raw.includes('REGION 3')) return 'REGION 3';
+    if (raw.includes('REGION 4')) return 'REGION 4';
+    return 'LAINNYA';
+  }
+
   function getVisibleCoachingRows() {
     return (coachingRows || []).filter(r => {
       const matchRegion = !coachingFilter.region || r.region === coachingFilter.region;
@@ -785,8 +796,9 @@
 
   function renderCoachingDashboard() {
     renderCoachingStats();
-    renderCoachingRegionList();
+    renderCoachingRegionCards();
     renderCoachingBranchList();
+    renderCoachingJobList();
     updateCoachingScopeText();
   }
 
@@ -819,34 +831,40 @@
     setText('coach-stat-' + id + '-p', pct + '%');
   }
 
-  function renderCoachingRegionList() {
-    const box = document.getElementById('coaching-region-list');
+  function renderCoachingRegionCards() {
+    const box = document.getElementById('coaching-region-card-grid');
     if (!box) return;
-
-    const map = {};
+    const map = { 'REGION 1': 0, 'REGION 2': 0, 'REGION 3': 0, 'REGION 4': 0, 'LAINNYA': 0 };
     (coachingRows || []).forEach(r => {
-      if (!map[r.region]) map[r.region] = { total: 0 };
-      map[r.region].total++;
+      if (r.status !== 'BELUM COACHING') return;
+      const key = normalizeRegionLabel(r.region);
+      map[key] = (map[key] || 0) + 1;
     });
 
-    const html = Object.keys(map).sort().map(region => `
-      <button class="hierarchy-item" onclick="filterCoachingByRegion(${toJsString(region)})">
-        <span>
-          <strong>${escapeHtml(region)}</strong>
-          <small>${map[region].total.toLocaleString('id-ID')} staff</small>
-        </span>
-        <span class="hierarchy-count">${map[region].total.toLocaleString('id-ID')}</span>
-      </button>
-    `).join('');
+    const sorted = [...coachingRegionBuckets].sort((a, b) => (map[b] || 0) - (map[a] || 0));
+    const html = sorted.map(region => {
+      const count = map[region] || 0;
+      const active = coachingFilter.region === region ? ' active' : '';
+      return `
+        <button class="coaching-region-card${active}" onclick="filterCoachingByRegion(${toJsString(region)})">
+          <strong>${count.toLocaleString('id-ID')}</strong>
+          <span>${escapeHtml(region)}</span>
+          <small>Belum coaching</small>
+        </button>
+      `;
+    }).join('');
 
-    box.innerHTML = html || '<div class="empty-state">Region belum tersedia.</div>';
+    box.innerHTML = html;
   }
 
   function renderCoachingBranchList() {
     const box = document.getElementById('coaching-branch-list');
     if (!box) return;
 
-    const rows = (coachingRows || []).filter(r => !coachingFilter.region || r.region === coachingFilter.region);
+    const rows = (coachingRows || []).filter(r =>
+      r.status === 'BELUM COACHING' &&
+      (!coachingFilter.region || normalizeRegionLabel(r.region) === coachingFilter.region)
+    );
     const map = {};
     rows.forEach(r => {
       const cab = r.cab || 'CABANG LAINNYA';
@@ -854,8 +872,10 @@
       map[cab].total++;
     });
 
-    const html = Object.keys(map).sort().map(cabang => `
-      <button class="hierarchy-item" onclick="filterCoachingByBranch(${toJsString(cabang)})">
+    const html = Object.keys(map)
+      .sort((a, b) => (map[b].total - map[a].total) || a.localeCompare(b))
+      .map(cabang => `
+      <button class="hierarchy-item${coachingFilter.cabang === cabang ? ' active' : ''}" onclick="filterCoachingByBranch(${toJsString(cabang)})" ondblclick="filterCoachingByBranch(${toJsString(cabang)})">
         <span>
           <strong>${escapeHtml(cabang)}</strong>
           <small>${map[cabang].total.toLocaleString('id-ID')} staff</small>
@@ -864,12 +884,42 @@
       </button>
     `).join('');
 
-    box.innerHTML = html || '<div class="empty-state">Cabang belum tersedia.</div>';
+    box.innerHTML = html || '<div class="empty-state">Belum ada data cabang belum coaching pada region ini.</div>';
+  }
+
+  function renderCoachingJobList() {
+    const box = document.getElementById('coaching-job-list');
+    if (!box) return;
+
+    const rows = (coachingRows || []).filter(r =>
+      r.status === 'BELUM COACHING' &&
+      (!coachingFilter.region || normalizeRegionLabel(r.region) === coachingFilter.region)
+    );
+    const map = {};
+    rows.forEach(r => {
+      const jab = r.jab || 'JABATAN LAINNYA';
+      if (!map[jab]) map[jab] = { total: 0 };
+      map[jab].total++;
+    });
+
+    const html = Object.keys(map)
+      .sort((a, b) => (map[b].total - map[a].total) || a.localeCompare(b))
+      .map(jab => `
+      <div class="hierarchy-item hierarchy-item-static">
+        <span>
+          <strong>${escapeHtml(jab)}</strong>
+          <small>${map[jab].total.toLocaleString('id-ID')} staff</small>
+        </span>
+        <span class="hierarchy-count">${map[jab].total.toLocaleString('id-ID')}</span>
+      </div>
+    `).join('');
+
+    box.innerHTML = html || '<div class="empty-state">Belum ada data jabatan belum coaching pada region ini.</div>';
   }
 
   function updateCoachingScopeText() {
-    let title = 'Semua Region';
-    if (coachingFilter.region) title = coachingFilter.region;
+    let title = 'Semua Region - BELUM COACHING';
+    if (coachingFilter.region) title = coachingFilter.region + ' - BELUM COACHING';
     if (coachingFilter.cabang) title = coachingFilter.cabang;
     if (coachingFilter.status) title += ' - ' + coachingFilter.status;
 
@@ -886,6 +936,7 @@
   function filterCoachingByRegion(region) {
     coachingFilter.region = region;
     coachingFilter.cabang = '';
+    coachingFilter.status = 'BELUM COACHING';
     renderCoachingDashboard();
     sortCoachingInteractive(currentSort.col || 'nama', true);
   }
