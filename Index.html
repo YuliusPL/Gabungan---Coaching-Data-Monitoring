@@ -172,13 +172,15 @@
                           <th style="min-width:120px;">Role User</th>
                           <th style="min-width:140px;">NIK Atasan</th>
                           <th style="min-width:180px;">Nama Atasan</th>
+                          <th style="min-width:150px;">NIK Atasan 2</th>
+                          <th style="min-width:190px;">Nama Atasan 2</th>
                           <th style="min-width:190px;">Email</th>
                           <th style="min-width:120px;">No WA</th>
                           <th style="min-width:120px;">Status</th>
                         </tr>
                       </thead>
                       <tbody id="admin-karyawan-body">
-                        <tr><td colspan="12" class="empty-state">Memuat data karyawan...</td></tr>
+                        <tr><td colspan="14" class="empty-state">Memuat data karyawan...</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -186,9 +188,41 @@
               </div>
 
               <div id="admin-section-users" class="admin-section">
-                <div class="card-mewah">
-                  <h6 class="section-title-main">User Management</h6>
-                  <p class="section-desc mb-0">Modul ini disiapkan berikutnya. Struktur menu sudah tersedia.</p>
+                <div class="card-mewah admin-user-card">
+                  <h6 class="section-title-main">User Management - Pendaftaran User ID</h6>
+                  <p class="section-desc mb-2">Form pendaftaran akun internal (NIK/Nama auto search, Jabatan otomatis, Cabang dropdown).</p>
+                  <div class="row g-3">
+                    <div class="col-12 col-lg-6">
+                      <label class="form-label-lite">NIK (Auto Search)</label>
+                      <input type="text" id="reg-nik" class="form-control input-elegant" list="reg-nik-list" placeholder="Ketik / pilih NIK" onchange="onRegisterNikChange()" oninput="onRegisterNikChange()">
+                      <datalist id="reg-nik-list"></datalist>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                      <label class="form-label-lite">Nama (Auto Search)</label>
+                      <input type="text" id="reg-nama" class="form-control input-elegant" list="reg-nama-list" placeholder="Ketik / pilih Nama Karyawan" onchange="onRegisterNamaChange()" oninput="onRegisterNamaChange()">
+                      <datalist id="reg-nama-list"></datalist>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label-lite">Jabatan (Otomatis)</label>
+                      <input type="text" id="reg-jabatan" class="form-control input-elegant" readonly>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label-lite">Cabang (Dropdown)</label>
+                      <select id="reg-cabang" class="form-select input-elegant"></select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label-lite">Password</label>
+                      <input type="password" id="reg-password" class="form-control input-elegant" placeholder="Isi password">
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label-lite">Re Password</label>
+                      <input type="password" id="reg-repassword" class="form-control input-elegant" placeholder="Ulangi password">
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-admin-main w-100 fw-bold py-3 shadow-sm mt-4" onclick="registerNewUserId()">
+                    <i class="bi bi-person-plus-fill me-2"></i>DAFTAR USER ID
+                  </button>
+                  <p class="admin-user-tip mb-0">Role aplikasi diisi otomatis dari Jabatan: Head → HEAD, Branch Manager → BM, Supervisor → SUPERVISOR, lainnya → STAFF.</p>
                 </div>
               </div>
 

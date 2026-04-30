@@ -397,6 +397,102 @@ function getEmployeeDirectoryData() {
   };
 }
 
+function getUserRegistrationReferenceData() {
+  var directory = getEmployeeDirectoryData();
+  var records = directory.records || [];
+  var uniqueBranches = {};
+
+  var employees = records
+    .filter(function(rec) {
+      var status = String(rec.statusKaryawan || '').toUpperCase().trim();
+      return status === '' || status === 'AKTIF' || status === 'ACTIVE';
+    })
+    .map(function(rec) {
+      var cab = String(rec.cabang || '').trim();
+      if (cab) uniqueBranches[cab.toUpperCase()] = cab;
+      return {
+        nik: String(rec.nik || '').trim(),
+        nama: String(rec.nama || '').trim(),
+        jabatan: String(rec.jabatan || '').trim(),
+        cabang: cab
+      };
+    })
+    .filter(function(rec) { return rec.nik && rec.nama; });
+
+  var branches = Object.keys(uniqueBranches)
+    .sort()
+    .map(function(k) { return uniqueBranches[k]; });
+
+  return {
+    employees: employees,
+    branches: branches
+  };
+}
+
+function registerUserId(payload) {
+  payload = payload || {};
+  var nik = String(payload.nik || '').trim();
+  var nama = String(payload.nama || '').trim();
+  var jabatan = String(payload.jabatan || '').trim();
+  var cabang = String(payload.cabang || '').trim();
+  var password = String(payload.password || '');
+  var rePassword = String(payload.rePassword || '');
+
+  if (!nik || !nama || !jabatan || !cabang) return { ok: false, message: 'NIK, Nama, Jabatan, dan Cabang wajib diisi.' };
+  if (!password || !rePassword) return { ok: false, message: 'Password dan Re Password wajib diisi.' };
+  if (password !== rePassword) return { ok: false, message: 'Password dan Re Password tidak sama.' };
+  if (password.length < 6) return { ok: false, message: 'Password minimal 6 karakter.' };
+
+  var ref = getUserRegistrationReferenceData();
+  var matched = (ref.employees || []).find(function(rec) {
+    return String(rec.nik || '').trim() === nik && String(rec.nama || '').trim().toUpperCase() === nama.toUpperCase();
+  });
+  if (!matched) return { ok: false, message: 'NIK dan Nama tidak cocok dengan DB_Karyawan.' };
+
+  var roleApp = deriveRoleFromJabatan(jabatan);
+  var ss = getDB();
+  var sh = ss.getSheetByName('User_ID') || ss.insertSheet('User_ID');
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(['NIK', 'NAMA', 'CABANG', 'PASSWORD', 'ROLE_APP', 'STATUS_USER', 'UPDATED_AT']);
+  }
+
+  var data = sh.getDataRange().getValues();
+  var hdr = data[0] || [];
+  var idxNik = 0;
+  var idxNama = 1;
+  var idxCab = 2;
+  var idxPass = 3;
+  var idxRole = 4;
+  var idxStatus = 5;
+  var idxUpdatedAt = 6;
+
+  // Backward compatibility: jika header lama (email,nama,...), tetap upayakan update by nik di kolom 0.
+  var targetRow = -1;
+  for (var r = 1; r < data.length; r++) {
+    if (String((data[r] && data[r][idxNik]) || '').trim() === nik) {
+      targetRow = r + 1;
+      break;
+    }
+  }
+
+  var rowValues = [nik, nama, cabang, password, roleApp, 'AKTIF', new Date()];
+  if (targetRow > 0) {
+    sh.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    sh.appendRow(rowValues);
+  }
+
+  return { ok: true, message: 'User ID berhasil disimpan.', roleApp: roleApp };
+}
+
+function deriveRoleFromJabatan(jabatan) {
+  var j = String(jabatan || '').toUpperCase();
+  if (j.indexOf('HEAD') !== -1) return 'HEAD';
+  if (j.indexOf('BRANCH MANAGER') !== -1) return 'BM';
+  if (j.indexOf('SUPERVISOR') !== -1) return 'SUPERVISOR';
+  return 'STAFF';
+}
+
 function saveCoachingAction(obj) {
   var ss = getDB();
   var sh = ss.getSheetByName('Raw_Coaching') || ss.insertSheet('Raw_Coaching');

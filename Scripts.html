@@ -2,6 +2,7 @@
   let db = { u: {}, achv: [], cair: [], pipeline: [], listCHome: [], listCPipe: [], listS: [] };
   let dbCoaching = { master: [], coaching: [], progress: [] };
   let dbAdminEmployee = { headers: [], rows: [], total: 0 };
+  let adminUserDirectory = { records: [], byNik: {}, byName: {}, branches: [] };
   let adminEmployeeViewRows = [];
   const adminEmployeeFilter = { keyword: '', branch: '' };
   let currentAdminSection = 'karyawan';
@@ -700,6 +701,9 @@
     if (currentAdminSection === 'karyawan' && (!dbAdminEmployee.rows || !dbAdminEmployee.rows.length)) {
       loadAdminKaryawan();
     }
+    if (currentAdminSection === 'users' && (!adminUserDirectory.records || !adminUserDirectory.records.length)) {
+      loadUserRegistrationReference();
+    }
   }
 
   function loadAdminKaryawan() {
@@ -808,6 +812,117 @@
     if (cabangEl) cabangEl.textContent = String(Object.keys(uniq).length);
     if (activeEl) activeEl.textContent = String(activeCount);
     if (nonActiveEl) nonActiveEl.textContent = String(nonActiveCount);
+  }
+
+  function loadUserRegistrationReference() {
+    google.script.run
+      .withSuccessHandler(res => {
+        const payload = res || {};
+        const employees = Array.isArray(payload.employees) ? payload.employees : [];
+        const branches = Array.isArray(payload.branches) ? payload.branches : [];
+        const byNik = {};
+        const byName = {};
+        employees.forEach(rec => {
+          const nik = String((rec && rec.nik) || '').trim();
+          const nama = String((rec && rec.nama) || '').trim();
+          if (!nik || !nama) return;
+          byNik[nik] = rec;
+          byName[nama.toUpperCase()] = rec;
+        });
+        adminUserDirectory = { records: employees, byNik, byName, branches };
+        renderUserRegistrationSources();
+      })
+      .withFailureHandler(err => {
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal memuat referensi pendaftaran user', 'error');
+      })
+      .getUserRegistrationReferenceData();
+  }
+
+  function renderUserRegistrationSources() {
+    const nikList = document.getElementById('reg-nik-list');
+    const namaList = document.getElementById('reg-nama-list');
+    const cabangSelect = document.getElementById('reg-cabang');
+    if (nikList) {
+      nikList.innerHTML = (adminUserDirectory.records || [])
+        .map(r => `<option value="${escapeHtml(r.nik || '')}"></option>`)
+        .join('');
+    }
+    if (namaList) {
+      namaList.innerHTML = (adminUserDirectory.records || [])
+        .map(r => `<option value="${escapeHtml(r.nama || '')}"></option>`)
+        .join('');
+    }
+    if (cabangSelect) {
+      cabangSelect.innerHTML = '<option value="">Pilih Cabang</option>';
+      (adminUserDirectory.branches || []).forEach(cab => {
+        const value = String(cab || '').trim();
+        if (!value) return;
+        cabangSelect.add(new Option(value, value));
+      });
+    }
+  }
+
+  function onRegisterNikChange() {
+    const nikEl = document.getElementById('reg-nik');
+    const namaEl = document.getElementById('reg-nama');
+    const jabEl = document.getElementById('reg-jabatan');
+    const cabEl = document.getElementById('reg-cabang');
+    const nik = String((nikEl && nikEl.value) || '').trim();
+    const rec = adminUserDirectory.byNik ? adminUserDirectory.byNik[nik] : null;
+    if (!rec) return;
+    if (namaEl) namaEl.value = rec.nama || '';
+    if (jabEl) jabEl.value = rec.jabatan || '';
+    if (cabEl) cabEl.value = rec.cabang || '';
+  }
+
+  function onRegisterNamaChange() {
+    const nikEl = document.getElementById('reg-nik');
+    const namaEl = document.getElementById('reg-nama');
+    const jabEl = document.getElementById('reg-jabatan');
+    const cabEl = document.getElementById('reg-cabang');
+    const nama = String((namaEl && namaEl.value) || '').trim().toUpperCase();
+    const rec = adminUserDirectory.byName ? adminUserDirectory.byName[nama] : null;
+    if (!rec) return;
+    if (nikEl) nikEl.value = rec.nik || '';
+    if (jabEl) jabEl.value = rec.jabatan || '';
+    if (cabEl) cabEl.value = rec.cabang || '';
+  }
+
+  function registerNewUserId() {
+    const nik = getValue('reg-nik');
+    const nama = getValue('reg-nama');
+    const jabatan = getValue('reg-jabatan');
+    const cabang = getValue('reg-cabang');
+    const password = getValue('reg-password');
+    const rePassword = getValue('reg-repassword');
+
+    if (!nik || !nama || !jabatan || !cabang || !password || !rePassword) {
+      Swal.fire('Validasi', 'Semua field wajib diisi.', 'warning');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(res => {
+        const out = res || {};
+        if (!out.ok) {
+          Swal.fire('Gagal', out.message || 'Pendaftaran user gagal', 'error');
+          return;
+        }
+        Swal.fire('Sukses', `${out.message || 'User tersimpan'}\nRole: ${out.roleApp || '-'}`, 'success');
+        setValue('reg-password', '');
+        setValue('reg-repassword', '');
+      })
+      .withFailureHandler(err => {
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal menyimpan user', 'error');
+      })
+      .registerUserId({
+        nik,
+        nama,
+        jabatan,
+        cabang,
+        password,
+        rePassword
+      });
   }
 
   function fetchCoachingAddon() {
