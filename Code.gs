@@ -400,6 +400,32 @@ function deleteAdminEmployeeByNik(nik) {
   return { ok: false, message: 'NIK tidak ditemukan.' };
 }
 
+function deleteAdminEmployeeByNikMode(nik, mode) {
+  var modeVal = String(mode || 'hard').toLowerCase();
+  if (modeVal === 'soft') return deactivateAdminEmployeeByNik(nik);
+  return deleteAdminEmployeeByNik(nik);
+}
+
+function deactivateAdminEmployeeByNik(nik) {
+  var key = String(nik || '').trim();
+  if (!key) return { ok: false, message: 'NIK wajib diisi.' };
+  var ss = getDB();
+  var sh = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
+  if (!sh) return { ok: false, message: 'Sheet DB_Karyawan / Master_Karyawan tidak ditemukan.' };
+  var values = sh.getDataRange().getValues();
+  if (!values || values.length < 2) return { ok: false, message: 'Data karyawan kosong.' };
+  var headers = values[0] || [];
+  var idx = getDbKaryawanIndexMap(headers);
+  for (var r = 1; r < values.length; r++) {
+    if (String((values[r] && values[r][idx.nik]) || '').trim() === key) {
+      var statusVal = 'TIDAK AKTIF';
+      sh.getRange(r + 1, idx.statusKaryawan + 1).setValue(statusVal);
+      return { ok: true, message: 'Karyawan dinonaktifkan (soft delete).' };
+    }
+  }
+  return { ok: false, message: 'NIK tidak ditemukan.' };
+}
+
 function getEmployeeDirectoryData() {
   var rows = getEmployeeMasterData();
   if (!rows || rows.length === 0) {

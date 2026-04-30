@@ -710,7 +710,7 @@
 
   function loadAdminKaryawan() {
     const body = document.getElementById('admin-karyawan-body');
-    if (body) body.innerHTML = "<tr><td colspan='14' class='empty-state'>Memuat data karyawan...</td></tr>";
+    if (body) body.innerHTML = "<tr><td colspan='15' class='empty-state'>Memuat data karyawan...</td></tr>";
     google.script.run
       .withSuccessHandler(res => {
         const payload = res || {};
@@ -720,7 +720,7 @@
         renderAdminKaryawanTable();
       })
       .withFailureHandler(err => {
-        if (body) body.innerHTML = "<tr><td colspan='14' class='empty-state'>Gagal memuat data karyawan.</td></tr>";
+        if (body) body.innerHTML = "<tr><td colspan='15' class='empty-state'>Gagal memuat data karyawan.</td></tr>";
         Swal.fire('Error', err && err.message ? err.message : 'Gagal memuat data karyawan', 'error');
       })
       .getAdminEmployeeData();
@@ -760,7 +760,7 @@
     updateAdminSummaryCounts(filtered);
 
     if (!filtered.length) {
-      body.innerHTML = "<tr><td colspan='14' class='empty-state'>Data tidak ditemukan.</td></tr>";
+      body.innerHTML = "<tr><td colspan='15' class='empty-state'>Data tidak ditemukan.</td></tr>";
       return;
     }
 
@@ -780,6 +780,11 @@
         <td>${escapeHtml(r.email || '-')}</td>
         <td>${escapeHtml(r.wa || '-')}</td>
         <td><span class="badge-status ${String(r.statusKaryawan || '').toUpperCase().includes('AKTIF') ? 'st-app' : 'st-rej'}">${escapeHtml(r.statusKaryawan || '-')}</span></td>
+        <td>
+          <button type="button" class="btn btn-sm btn-outline-primary admin-karyawan-action-btn" onclick='openAdminEmployeeEditByNik(${toJsString(r.nik || "")})'>
+            <i class="bi bi-pencil-square"></i>
+          </button>
+        </td>
       </tr>
     `).join('');
   }
@@ -869,14 +874,17 @@
       return;
     }
     Swal.fire({
-      title: 'Hapus data karyawan?',
-      text: `NIK ${nik} akan dihapus dari DB_Karyawan.`,
-      icon: 'warning',
+      title: 'Pilih aksi penghapusan',
+      text: `NIK ${nik}: pilih Soft Delete atau Hapus Permanen.`,
+      icon: 'question',
+      showDenyButton: true,
       showCancelButton: true,
-      confirmButtonText: 'Ya, hapus',
+      confirmButtonText: 'Soft Delete',
+      denyButtonText: 'Hapus Permanen',
       cancelButtonText: 'Batal'
     }).then(result => {
-      if (!result.isConfirmed) return;
+      if (!result.isConfirmed && !result.isDenied) return;
+      const mode = result.isConfirmed ? 'soft' : 'hard';
       google.script.run
         .withSuccessHandler(res => {
           const out = res || {};
@@ -891,7 +899,7 @@
         .withFailureHandler(err => {
           Swal.fire('Error', err && err.message ? err.message : 'Gagal menghapus data karyawan', 'error');
         })
-        .deleteAdminEmployeeByNik(nik);
+        [mode === 'soft' ? 'deactivateAdminEmployeeByNik' : 'deleteAdminEmployeeByNik'](nik);
     });
   }
 
