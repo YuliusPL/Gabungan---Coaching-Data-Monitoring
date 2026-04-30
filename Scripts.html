@@ -704,17 +704,17 @@
 
   function loadAdminKaryawan() {
     const body = document.getElementById('admin-karyawan-body');
-    if (body) body.innerHTML = "<tr><td colspan='5' class='empty-state'>Memuat data karyawan...</td></tr>";
+    if (body) body.innerHTML = "<tr><td colspan='14' class='empty-state'>Memuat data karyawan...</td></tr>";
     google.script.run
       .withSuccessHandler(res => {
         const payload = res || {};
         const headers = Array.isArray(payload.headers) ? payload.headers : [];
         const rows = Array.isArray(payload.rows) ? payload.rows : [];
-        dbAdminEmployee = { headers, rows, summary: payload.summary || {} };
+        dbAdminEmployee = { headers, rows, summary: payload.summary || {}, idxMap: payload.indexMap || payload.idxMap || {} };
         renderAdminKaryawanTable();
       })
       .withFailureHandler(err => {
-        if (body) body.innerHTML = "<tr><td colspan='5' class='empty-state'>Gagal memuat data karyawan.</td></tr>";
+        if (body) body.innerHTML = "<tr><td colspan='14' class='empty-state'>Gagal memuat data karyawan.</td></tr>";
         Swal.fire('Error', err && err.message ? err.message : 'Gagal memuat data karyawan', 'error');
       })
       .getAdminEmployeeData();
@@ -732,11 +732,20 @@
     const filtered = rows.filter(r => {
       if (!keyword) return true;
       const cells = [
-        r[idx.nik] || '',
-        r[idx.nama] || '',
-        r[idx.cabang] || '',
-        r[idx.jabatan] || '',
-        r[idx.region] || ''
+        r.timestamp || '',
+        r.nik || '',
+        r.nama || '',
+        r.cabang || '',
+        r.jabatan || '',
+        r.divisi || '',
+        r.roleUser || '',
+        r.nikAtasan || '',
+        r.namaAtasan || '',
+        r.nikAtasan2 || '',
+        r.namaAtasan2 || '',
+        r.email || '',
+        r.wa || '',
+        r.statusKaryawan || ''
       ].map(v => String(v || '').toLowerCase());
       return cells.some(v => v.includes(keyword));
     });
@@ -745,51 +754,60 @@
     updateAdminSummaryCounts(filtered);
 
     if (!filtered.length) {
-      body.innerHTML = "<tr><td colspan='5' class='empty-state'>Data tidak ditemukan.</td></tr>";
+      body.innerHTML = "<tr><td colspan='14' class='empty-state'>Data tidak ditemukan.</td></tr>";
       return;
     }
 
     body.innerHTML = filtered.slice(0, 1000).map(r => `
       <tr>
-        <td>${escapeHtml(r[idx.nik] || '-')}</td>
-        <td class="fw-semibold">${escapeHtml(r[idx.nama] || '-')}</td>
-        <td>${escapeHtml(r[idx.cabang] || '-')}</td>
-        <td>${escapeHtml(r[idx.jabatan] || '-')}</td>
-        <td>${escapeHtml(r[idx.region] || '-')}</td>
+        <td>${escapeHtml(formatAdminTimestamp(r.timestamp))}</td>
+        <td>${escapeHtml(r.nik || '-')}</td>
+        <td class="fw-semibold">${escapeHtml(r.nama || '-')}</td>
+        <td>${escapeHtml(r.jabatan || '-')}</td>
+        <td>${escapeHtml(r.divisi || '-')}</td>
+        <td>${escapeHtml(r.cabang || '-')}</td>
+        <td>${escapeHtml(r.roleUser || '-')}</td>
+        <td>${escapeHtml(r.nikAtasan || '-')}</td>
+        <td>${escapeHtml(r.namaAtasan || '-')}</td>
+        <td>${escapeHtml(r.nikAtasan2 || '-')}</td>
+        <td>${escapeHtml(r.namaAtasan2 || '-')}</td>
+        <td>${escapeHtml(r.email || '-')}</td>
+        <td>${escapeHtml(r.wa || '-')}</td>
+        <td><span class="badge-status ${String(r.statusKaryawan || '').toUpperCase().includes('AKTIF') ? 'st-app' : 'st-rej'}">${escapeHtml(r.statusKaryawan || '-')}</span></td>
       </tr>
     `).join('');
   }
 
+  function formatAdminTimestamp(value) {
+    if (!value) return '-';
+    const d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleDateString('id-ID');
+  }
+
   function getAdminEmployeeIndexMap() {
-    const headers = (dbAdminEmployee.headers || []).map(h => String(h || '').toLowerCase());
-    const findIdx = (keys, fallback) => {
-      for (let i = 0; i < headers.length; i++) {
-        if (keys.some(k => headers[i].includes(k))) return i;
-      }
-      return fallback;
-    };
-    return {
-      nik: findIdx(['nik', 'npk', 'id pegawai', 'employee id'], 0),
-      nama: findIdx(['nama', 'name'], 1),
-      cabang: findIdx(['cabang', 'branch'], 2),
-      jabatan: findIdx(['jabatan', 'posisi', 'position'], 3),
-      region: findIdx(['region', 'wilayah', 'area'], 4)
-    };
+    return dbAdminEmployee.idxMap || {};
   }
 
   function updateAdminSummaryCounts(rows) {
     const totalEl = document.getElementById('admin-karyawan-total');
     const cabangEl = document.getElementById('admin-karyawan-cabang');
+    const activeEl = document.getElementById('admin-karyawan-aktif');
+    const nonActiveEl = document.getElementById('admin-karyawan-nonaktif');
     if (totalEl) totalEl.textContent = String((rows || []).length);
-    if (cabangEl) {
-      const idx = getAdminEmployeeIndexMap();
-      const uniq = {};
-      (rows || []).forEach(r => {
-        const cab = String((r && r[idx.cabang]) || '').trim().toUpperCase();
-        if (cab) uniq[cab] = true;
-      });
-      cabangEl.textContent = String(Object.keys(uniq).length);
-    }
+    const uniq = {};
+    let activeCount = 0;
+    let nonActiveCount = 0;
+    (rows || []).forEach(r => {
+      const cab = String((r && r.cabang) || '').trim().toUpperCase();
+      if (cab) uniq[cab] = true;
+      const st = String((r && r.statusKaryawan) || '').trim().toUpperCase();
+      if (st === 'AKTIF' || st === 'ACTIVE') activeCount++;
+      else if (st) nonActiveCount++;
+    });
+    if (cabangEl) cabangEl.textContent = String(Object.keys(uniq).length);
+    if (activeEl) activeEl.textContent = String(activeCount);
+    if (nonActiveEl) nonActiveEl.textContent = String(nonActiveCount);
   }
 
   function fetchCoachingAddon() {
@@ -879,12 +897,13 @@
   function buildCoachingRows() {
     const master = dbCoaching.master || [];
     const headers = master[0] || [];
-    const idxNik = getHeaderIndex(headers, ['nik'], 1);
+    const idxNik = getHeaderIndex(headers, ['nik', 'npk'], 1);
     const idxNama = getHeaderIndex(headers, ['nama karyawan', 'nama'], 2);
     const idxJab = getHeaderIndex(headers, ['jabatan'], 3);
     const idxRegion = getHeaderIndex(headers, ['region', 'divisi', 'departemen'], 4);
     const idxCab = getHeaderIndex(headers, ['cabang', 'lokasi'], 5);
     const idxRole = getHeaderIndex(headers, ['role user', 'role'], 6);
+    const idxStatusKaryawan = getHeaderIndex(headers, ['status karyawan', 'status'], 13);
 
     const rows = [];
     master.slice(1).forEach(m => {
@@ -910,6 +929,9 @@
         String(m[idxCab] || '').trim()
       );
 
+      const normalizedStatusKaryawan = normalizeEmployeeStatus(m[idxStatusKaryawan]);
+      if (normalizedStatusKaryawan === 'TIDAK AKTIF') return;
+
       rows.push({
         nik: String(m[idxNik] || '').trim(),
         nama,
@@ -918,6 +940,7 @@
         cab: normalized.cab,
         bm: resolveBmByBranch(normalized.cab, ''),
         role: String(m[idxRole] || '').trim(),
+        statusKaryawan: normalizedStatusKaryawan,
         status,
         lastId: latest ? String(latest[0] || '') : '',
         lastDate: latest ? formatDisplayDate(latest[1]) : '-',
@@ -927,6 +950,13 @@
     });
 
     return rows;
+  }
+
+  function normalizeEmployeeStatus(value) {
+    const status = String(value || '').trim().toUpperCase();
+    if (!status) return '';
+    if (status === 'AKTIF' || status === 'ACTIVE') return 'AKTIF';
+    return 'TIDAK AKTIF';
   }
 
   function isLikelyRegionLabel(value) {

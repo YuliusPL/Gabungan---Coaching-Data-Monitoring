@@ -157,18 +157,115 @@ function getEmployeeMasterData() {
   return sh.getDataRange().getValues();
 }
 
+function getDbKaryawanIndexMap(headers) {
+  var normalizedHeaders = (headers || []).map(function(h) {
+    return String(h || '').toLowerCase().trim();
+  });
+
+  function findIndex(candidates, fallback) {
+    for (var i = 0; i < normalizedHeaders.length; i++) {
+      var label = normalizedHeaders[i];
+      var found = candidates.some(function(c) {
+        return label.indexOf(String(c).toLowerCase()) !== -1;
+      });
+      if (found) return i;
+    }
+    return fallback;
+  }
+
+  // Default fallback mengikuti struktur DB_Karyawan (A..N)
+  return {
+    timestamp: findIndex(['timestamp', 'waktu'], 0),
+    nik: findIndex(['nik', 'npk'], 1),
+    nama: findIndex(['nama karyawan', 'nama'], 2),
+    jabatan: findIndex(['jabatan', 'posisi', 'position'], 3),
+    divisi: findIndex(['divisi', 'departemen', 'department'], 4),
+    cabang: findIndex(['cabang', 'lokasi kerja', 'branch'], 5),
+    roleUser: findIndex(['role user', 'role'], 6),
+    nikAtasan: findIndex(['nik atasan langsung'], 7),
+    namaAtasan: findIndex(['nama atasan langsung'], 8),
+    nikAtasan2: findIndex(['nik atasan dari atasan langsung', 'nik atasan 2'], 9),
+    namaAtasan2: findIndex(['nama atasan dari atasan langsung', 'nama atasan 2'], 10),
+    email: findIndex(['email karyawan', 'email'], 11),
+    wa: findIndex(['no wa', 'wa', 'whatsapp'], 12),
+    statusKaryawan: findIndex(['status karyawan', 'status aktif', 'status'], 13)
+  };
+}
+
 function getAdminEmployeeData() {
   var rows = getEmployeeMasterData();
   if (!rows || rows.length === 0) {
     return {
       headers: [],
       rows: [],
-      summary: { total: 0, active: 0, nonActive: 0, regions: 0, branches: 0 }
+      indexMap: {},
+      summary: { total: 0, active: 0, nonActive: 0, branches: 0, roles: 0, hasHierarchy: 0 }
     };
   }
 
   var headers = rows[0] || [];
   var dataRows = rows.slice(1);
+  var idx = getDbKaryawanIndexMap(headers);
+
+  var uniqueBranches = {};
+  var uniqueRoles = {};
+  var activeCount = 0;
+  var nonActiveCount = 0;
+  var hierarchyCount = 0;
+
+  var normalizedRows = dataRows.map(function(r) {
+    var branch = String((r && r[idx.cabang]) || '').trim().toUpperCase();
+    var role = String((r && r[idx.roleUser]) || '').trim().toUpperCase();
+    var status = String((r && r[idx.statusKaryawan]) || '').trim().toUpperCase();
+    var nikAtasan = String((r && r[idx.nikAtasan]) || '').trim();
+    var nikAtasan2 = String((r && r[idx.nikAtasan2]) || '').trim();
+
+    if (branch) uniqueBranches[branch] = true;
+    if (role) uniqueRoles[role] = true;
+    if (status === 'AKTIF' || status === 'ACTIVE') activeCount++;
+    else if (status) nonActiveCount++;
+    if (nikAtasan || nikAtasan2) hierarchyCount++;
+
+    return {
+      timestamp: r[idx.timestamp] || '',
+      nik: String(r[idx.nik] || '').trim(),
+      nama: String(r[idx.nama] || '').trim(),
+      jabatan: String(r[idx.jabatan] || '').trim(),
+      divisi: String(r[idx.divisi] || '').trim(),
+      cabang: String(r[idx.cabang] || '').trim(),
+      roleUser: String(r[idx.roleUser] || '').trim(),
+      nikAtasan: nikAtasan,
+      namaAtasan: String(r[idx.namaAtasan] || '').trim(),
+      nikAtasan2: nikAtasan2,
+      namaAtasan2: String(r[idx.namaAtasan2] || '').trim(),
+      email: String(r[idx.email] || '').trim(),
+      wa: String(r[idx.wa] || '').trim(),
+      statusKaryawan: String(r[idx.statusKaryawan] || '').trim()
+    };
+  });
+
+  return {
+    headers: headers,
+    rows: normalizedRows,
+    indexMap: idx,
+    summary: {
+      total: normalizedRows.length,
+      active: activeCount,
+      nonActive: nonActiveCount,
+      branches: Object.keys(uniqueBranches).length,
+      roles: Object.keys(uniqueRoles).length,
+      hasHierarchy: hierarchyCount
+    }
+  };
+}
+
+function getEmployeeDirectoryData() {
+  var rows = getEmployeeMasterData();
+  if (!rows || rows.length === 0) {
+    return { headers: [], records: [], byNik: {}, byName: {} };
+  }
+
+  var headers = rows[0] || [];
   var normalizedHeaders = headers.map(function(h) {
     return String(h || '').toLowerCase();
   });
@@ -182,38 +279,59 @@ function getAdminEmployeeData() {
     return fallback;
   }
 
-  var idxRegion = headerIndex(['region', 'wilayah'], 0);
-  var idxBranch = headerIndex(['cabang', 'branch'], 1);
-  var idxStatus = headerIndex(['status', 'aktif'], -1);
+  var idx = {
+    timestamp: headerIndex(['timestamp', 'waktu'], 0),
+    nik: headerIndex(['nik', 'npk'], 1),
+    nama: headerIndex(['nama karyawan', 'nama'], 2),
+    jabatan: headerIndex(['jabatan', 'posisi', 'position'], 3),
+    divisi: headerIndex(['divisi', 'departemen', 'department'], 4),
+    cabang: headerIndex(['cabang', 'lokasi kerja', 'branch'], 5),
+    role: headerIndex(['role user', 'role'], 6),
+    nikAtasan: headerIndex(['nik atasan langsung', 'atasan langsung'], 7),
+    namaAtasan: headerIndex(['nama atasan langsung'], 8),
+    nikAtasan2: headerIndex(['nik atasan dari atasan langsung'], 9),
+    namaAtasan2: headerIndex(['nama atasan dari atasan langsung'], 10),
+    email: headerIndex(['email karyawan', 'email'], 11),
+    wa: headerIndex(['no wa', 'wa', 'whatsapp'], 12),
+    status: headerIndex(['status karyawan', 'status'], 13)
+  };
 
-  var uniqueRegions = {};
-  var uniqueBranches = {};
-  var activeCount = 0;
-  var nonActiveCount = 0;
+  var records = [];
+  var byNik = {};
+  var byName = {};
 
-  dataRows.forEach(function(r) {
-    var region = String((r && r[idxRegion]) || '').trim().toUpperCase();
-    var branch = String((r && r[idxBranch]) || '').trim().toUpperCase();
-    if (region) uniqueRegions[region] = true;
-    if (branch) uniqueBranches[branch] = true;
+  rows.slice(1).forEach(function(r) {
+    var nik = String((r && r[idx.nik]) || '').trim();
+    var nama = String((r && r[idx.nama]) || '').trim();
+    if (!nik && !nama) return;
 
-    if (idxStatus >= 0) {
-      var status = String((r && r[idxStatus]) || '').trim().toUpperCase();
-      if (status === 'AKTIF' || status === 'ACTIVE') activeCount++;
-      else if (status) nonActiveCount++;
-    }
+    var rec = {
+      timestamp: r[idx.timestamp] || '',
+      nik: nik,
+      nama: nama,
+      jabatan: String((r && r[idx.jabatan]) || '').trim(),
+      divisi: String((r && r[idx.divisi]) || '').trim(),
+      cabang: String((r && r[idx.cabang]) || '').trim(),
+      roleUser: String((r && r[idx.role]) || '').trim(),
+      nikAtasanLangsung: String((r && r[idx.nikAtasan]) || '').trim(),
+      namaAtasanLangsung: String((r && r[idx.namaAtasan]) || '').trim(),
+      nikAtasan2: String((r && r[idx.nikAtasan2]) || '').trim(),
+      namaAtasan2: String((r && r[idx.namaAtasan2]) || '').trim(),
+      email: String((r && r[idx.email]) || '').trim(),
+      noWa: String((r && r[idx.wa]) || '').trim(),
+      statusKaryawan: String((r && r[idx.status]) || '').trim()
+    };
+
+    records.push(rec);
+    if (nik) byNik[nik] = rec;
+    if (nama) byName[nama.toUpperCase()] = rec;
   });
 
   return {
     headers: headers,
-    rows: dataRows,
-    summary: {
-      total: dataRows.length,
-      active: activeCount,
-      nonActive: nonActiveCount,
-      regions: Object.keys(uniqueRegions).length,
-      branches: Object.keys(uniqueBranches).length
-    }
+    records: records,
+    byNik: byNik,
+    byName: byName
   };
 }
 

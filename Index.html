@@ -140,6 +140,18 @@
                         <b id="admin-karyawan-total">0</b>
                       </div>
                     </div>
+                    <div class="col-6 col-lg-1">
+                      <div class="admin-mini-stat">
+                        <small>Aktif</small>
+                        <b id="admin-karyawan-aktif">0</b>
+                      </div>
+                    </div>
+                    <div class="col-6 col-lg-1">
+                      <div class="admin-mini-stat">
+                        <small>Nonaktif</small>
+                        <b id="admin-karyawan-nonaktif">0</b>
+                      </div>
+                    </div>
                     <div class="col-6 col-lg-2">
                       <div class="admin-mini-stat">
                         <small>Cabang</small>
@@ -151,15 +163,22 @@
                     <table class="table table-hover align-middle mb-0 admin-karyawan-table">
                       <thead>
                         <tr>
+                          <th style="min-width:120px;">Timestamp</th>
                           <th style="min-width:130px;">NIK/NPK</th>
                           <th style="min-width:200px;">Nama Karyawan</th>
-                          <th style="min-width:160px;">Cabang</th>
                           <th style="min-width:150px;">Jabatan</th>
-                          <th style="min-width:120px;">Region</th>
+                          <th style="min-width:180px;">Divisi/Departemen</th>
+                          <th style="min-width:160px;">Cabang / Lokasi</th>
+                          <th style="min-width:120px;">Role User</th>
+                          <th style="min-width:140px;">NIK Atasan</th>
+                          <th style="min-width:180px;">Nama Atasan</th>
+                          <th style="min-width:190px;">Email</th>
+                          <th style="min-width:120px;">No WA</th>
+                          <th style="min-width:120px;">Status</th>
                         </tr>
                       </thead>
                       <tbody id="admin-karyawan-body">
-                        <tr><td colspan="5" class="empty-state">Memuat data karyawan...</td></tr>
+                        <tr><td colspan="12" class="empty-state">Memuat data karyawan...</td></tr>
                       </tbody>
                     </table>
                   </div>
