@@ -4,6 +4,8 @@
   let dbAdminEmployee = { headers: [], rows: [], total: 0 };
   let adminUserDirectory = { records: [], byNik: {}, byName: {}, branches: [] };
   let adminEmployeeViewRows = [];
+  let adminKaryawanEditMode = 'add';
+  let adminKaryawanOriginalNik = '';
   const adminEmployeeFilter = { keyword: '', branch: '' };
   let currentAdminSection = 'karyawan';
   let chartMix = null;
@@ -763,7 +765,7 @@
     }
 
     body.innerHTML = filtered.slice(0, 1000).map(r => `
-      <tr>
+      <tr ondblclick='openAdminEmployeeEditByNik(${toJsString(r.nik || "")})' title="Double klik untuk edit data">
         <td>${escapeHtml(formatAdminTimestamp(r.timestamp))}</td>
         <td>${escapeHtml(r.nik || '-')}</td>
         <td class="fw-semibold">${escapeHtml(r.nama || '-')}</td>
@@ -780,6 +782,131 @@
         <td><span class="badge-status ${String(r.statusKaryawan || '').toUpperCase().includes('AKTIF') ? 'st-app' : 'st-rej'}">${escapeHtml(r.statusKaryawan || '-')}</span></td>
       </tr>
     `).join('');
+  }
+
+  function openAdminEmployeeCreate() {
+    adminKaryawanEditMode = 'add';
+    adminKaryawanOriginalNik = '';
+    setText('admin-karyawan-editor-title', 'Tambah Data Karyawan');
+    setText('admin-karyawan-editor-mode', 'MODE TAMBAH');
+    ['adm-form-nik', 'adm-form-nama', 'adm-form-jabatan', 'adm-form-divisi', 'adm-form-cabang', 'adm-form-role-user', 'adm-form-nik-atasan', 'adm-form-nama-atasan', 'adm-form-nik-atasan2', 'adm-form-nama-atasan2', 'adm-form-email', 'adm-form-wa']
+      .forEach(id => setValue(id, ''));
+    setValue('adm-form-status', 'AKTIF');
+    const editor = document.getElementById('admin-karyawan-editor');
+    if (editor) editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function openAdminEmployeeEditByNik(nik) {
+    const key = String(nik || '').trim();
+    if (!key) return;
+    const rec = (dbAdminEmployee.rows || []).find(r => String((r && r.nik) || '').trim() === key);
+    if (!rec) return;
+    adminKaryawanEditMode = 'edit';
+    adminKaryawanOriginalNik = key;
+    setText('admin-karyawan-editor-title', 'Edit Data Karyawan');
+    setText('admin-karyawan-editor-mode', 'MODE EDIT');
+    setValue('adm-form-nik', rec.nik || '');
+    setValue('adm-form-nama', rec.nama || '');
+    setValue('adm-form-jabatan', rec.jabatan || '');
+    setValue('adm-form-divisi', rec.divisi || '');
+    setValue('adm-form-cabang', rec.cabang || '');
+    setValue('adm-form-role-user', rec.roleUser || '');
+    setValue('adm-form-nik-atasan', rec.nikAtasan || '');
+    setValue('adm-form-nama-atasan', rec.namaAtasan || '');
+    setValue('adm-form-nik-atasan2', rec.nikAtasan2 || '');
+    setValue('adm-form-nama-atasan2', rec.namaAtasan2 || '');
+    setValue('adm-form-email', rec.email || '');
+    setValue('adm-form-wa', rec.wa || '');
+    setValue('adm-form-status', rec.statusKaryawan || 'AKTIF');
+    const editor = document.getElementById('admin-karyawan-editor');
+    if (editor) editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function saveAdminEmployeeFromForm() {
+    const payload = {
+      originalNik: adminKaryawanOriginalNik || '',
+      nik: getValue('adm-form-nik'),
+      nama: getValue('adm-form-nama'),
+      jabatan: getValue('adm-form-jabatan'),
+      divisi: getValue('adm-form-divisi'),
+      cabang: getValue('adm-form-cabang'),
+      roleUser: getValue('adm-form-role-user'),
+      nikAtasan: getValue('adm-form-nik-atasan'),
+      namaAtasan: getValue('adm-form-nama-atasan'),
+      nikAtasan2: getValue('adm-form-nik-atasan2'),
+      namaAtasan2: getValue('adm-form-nama-atasan2'),
+      email: getValue('adm-form-email'),
+      wa: getValue('adm-form-wa'),
+      statusKaryawan: getValue('adm-form-status')
+    };
+
+    if (!payload.nik || !payload.nama) {
+      Swal.fire('Validasi', 'NIK dan Nama Karyawan wajib diisi.', 'warning');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(res => {
+        const out = res || {};
+        if (!out.ok) {
+          Swal.fire('Gagal', out.message || 'Simpan data gagal', 'error');
+          return;
+        }
+        Swal.fire('Sukses', out.message || 'Data karyawan berhasil disimpan', 'success');
+        loadAdminKaryawan();
+        openAdminEmployeeCreate();
+      })
+      .withFailureHandler(err => {
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal menyimpan data karyawan', 'error');
+      })
+      .saveAdminEmployee(payload);
+  }
+
+  function deleteAdminEmployeeFromForm() {
+    const nik = getValue('adm-form-nik');
+    if (!nik) {
+      Swal.fire('Validasi', 'Isi NIK yang akan dihapus.', 'warning');
+      return;
+    }
+    Swal.fire({
+      title: 'Hapus data karyawan?',
+      text: `NIK ${nik} akan dihapus dari DB_Karyawan.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Ya, hapus',
+      cancelButtonText: 'Batal'
+    }).then(result => {
+      if (!result.isConfirmed) return;
+      google.script.run
+        .withSuccessHandler(res => {
+          const out = res || {};
+          if (!out.ok) {
+            Swal.fire('Gagal', out.message || 'Hapus data gagal', 'error');
+            return;
+          }
+          Swal.fire('Sukses', out.message || 'Data karyawan berhasil dihapus', 'success');
+          loadAdminKaryawan();
+          openAdminEmployeeCreate();
+        })
+        .withFailureHandler(err => {
+          Swal.fire('Error', err && err.message ? err.message : 'Gagal menghapus data karyawan', 'error');
+        })
+        .deleteAdminEmployeeByNik(nik);
+    });
+  }
+
+  function resetAdminEmployeeForm() {
+    openAdminEmployeeCreate();
+  }
+
+  function formatInputDate(value) {
+    if (!value) return '';
+    const d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   function formatAdminTimestamp(value) {

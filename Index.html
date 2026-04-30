@@ -126,9 +126,14 @@
                       <h6 class="section-title-main mb-1">Data Karyawan</h6>
                       <p class="section-desc mb-0">Daftar master karyawan dari DB_Karyawan / Master_Karyawan.</p>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadAdminKaryawan()">
-                      <i class="bi bi-arrow-repeat me-1"></i>Refresh
-                    </button>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button type="button" class="btn btn-sm btn-admin-main" onclick="openAdminEmployeeCreate()">
+                        <i class="bi bi-plus-circle me-1"></i>Tambah
+                      </button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadAdminKaryawan()">
+                        <i class="bi bi-arrow-repeat me-1"></i>Refresh
+                      </button>
+                    </div>
                   </div>
                   <div class="row g-2 mt-1">
                     <div class="col-12 col-lg-8">
@@ -183,6 +188,80 @@
                         <tr><td colspan="14" class="empty-state">Memuat data karyawan...</td></tr>
                       </tbody>
                     </table>
+                  </div>
+                  <div class="card-mewah mt-3 admin-karyawan-editor" id="admin-karyawan-editor">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h6 class="section-title-main mb-0" id="admin-karyawan-editor-title">Tambah Data Karyawan</h6>
+                      <span class="small text-muted" id="admin-karyawan-editor-mode">MODE TAMBAH</span>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-12 col-md-4">
+                        <label class="form-label-lite">NIK/NPK</label>
+                        <input type="text" id="adm-form-nik" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-8">
+                        <label class="form-label-lite">Nama Karyawan</label>
+                        <input type="text" id="adm-form-nama" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">Jabatan</label>
+                        <input type="text" id="adm-form-jabatan" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">Divisi/Departemen</label>
+                        <input type="text" id="adm-form-divisi" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">Cabang / Lokasi</label>
+                        <input type="text" id="adm-form-cabang" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">Role User</label>
+                        <input type="text" id="adm-form-role-user" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label-lite">NIK Atasan Langsung</label>
+                        <input type="text" id="adm-form-nik-atasan" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-8">
+                        <label class="form-label-lite">Nama Atasan Langsung</label>
+                        <input type="text" id="adm-form-nama-atasan" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label-lite">NIK Atasan Level 2</label>
+                        <input type="text" id="adm-form-nik-atasan2" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-8">
+                        <label class="form-label-lite">Nama Atasan Level 2</label>
+                        <input type="text" id="adm-form-nama-atasan2" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">Email Karyawan</label>
+                        <input type="email" id="adm-form-email" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">No WA</label>
+                        <input type="text" id="adm-form-wa" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label-lite">Status Karyawan</label>
+                        <select id="adm-form-status" class="form-select input-elegant">
+                          <option value="AKTIF">AKTIF</option>
+                          <option value="TIDAK AKTIF">TIDAK AKTIF</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                      <button type="button" class="btn btn-admin-main" onclick="saveAdminEmployeeFromForm()">
+                        <i class="bi bi-floppy-fill me-1"></i>Simpan
+                      </button>
+                      <button type="button" class="btn btn-outline-danger" onclick="deleteAdminEmployeeFromForm()">
+                        <i class="bi bi-trash-fill me-1"></i>Hapus
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary" onclick="resetAdminEmployeeForm()">
+                        <i class="bi bi-x-circle me-1"></i>Batal
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

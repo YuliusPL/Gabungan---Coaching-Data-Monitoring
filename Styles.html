@@ -1175,6 +1175,34 @@
     letter-spacing: 0.02em;
   }
 
+  .admin-karyawan-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .admin-karyawan-actions .btn {
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .admin-karyawan-table tr.row-edit-target {
+    background: rgba(246, 161, 58, 0.12);
+  }
+
+  .admin-karyawan-form-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  @media (min-width: 992px) {
+    .admin-karyawan-form-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
   .admin-user-card .form-label-lite {
     font-size: 11px;
     font-weight: 700;

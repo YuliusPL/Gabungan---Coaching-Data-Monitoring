@@ -321,6 +321,85 @@ function getAdminEmployeeData() {
   };
 }
 
+function saveAdminEmployee(payload) {
+  payload = payload || {};
+  var originalNik = String(payload.originalNik || '').trim();
+  var nik = String(payload.nik || '').trim();
+  var nama = String(payload.nama || '').trim();
+  if (!nik || !nama) return { ok: false, message: 'NIK dan Nama wajib diisi.' };
+
+  var ss = getDB();
+  var sh = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
+  if (!sh) return { ok: false, message: 'Sheet DB_Karyawan / Master_Karyawan tidak ditemukan.' };
+
+  var values = sh.getDataRange().getValues();
+  var headers = values[0] || [];
+  var idx = getDbKaryawanIndexMap(headers);
+
+  var writeRow = new Array(headers.length).fill('');
+  writeRow[idx.timestamp] = payload.timestamp ? new Date(payload.timestamp) : new Date();
+  writeRow[idx.nik] = nik;
+  writeRow[idx.nama] = nama;
+  writeRow[idx.jabatan] = String(payload.jabatan || '').trim();
+  writeRow[idx.divisi] = String(payload.divisi || '').trim();
+  writeRow[idx.cabang] = String(payload.cabang || '').trim();
+  writeRow[idx.roleUser] = String(payload.roleUser || '').trim();
+  writeRow[idx.nikAtasan] = String(payload.nikAtasan || '').trim();
+  writeRow[idx.namaAtasan] = String(payload.namaAtasan || '').trim();
+  writeRow[idx.nikAtasan2] = String(payload.nikAtasan2 || '').trim();
+  writeRow[idx.namaAtasan2] = String(payload.namaAtasan2 || '').trim();
+  writeRow[idx.email] = String(payload.email || '').trim();
+  writeRow[idx.wa] = String(payload.wa || '').trim();
+  writeRow[idx.statusKaryawan] = String(payload.statusKaryawan || 'AKTIF').trim();
+
+  var targetRow = -1;
+  var originalRow = -1;
+  for (var r = 1; r < values.length; r++) {
+    var rowNik = String((values[r] && values[r][idx.nik]) || '').trim();
+    if (rowNik === nik) {
+      targetRow = r + 1;
+    }
+    if (originalNik && rowNik === originalNik) {
+      originalRow = r + 1;
+    }
+  }
+
+  if (originalNik && originalNik !== nik) {
+    // Saat edit dan NIK diubah, cegah bentrok NIK existing lain.
+    if (targetRow > 0 && targetRow !== originalRow) {
+      return { ok: false, message: 'NIK baru sudah terdaftar. Gunakan NIK lain.' };
+    }
+    targetRow = originalRow;
+  }
+
+  if (targetRow > 0) {
+    sh.getRange(targetRow, 1, 1, headers.length).setValues([writeRow]);
+  } else {
+    sh.appendRow(writeRow);
+  }
+  CacheService.getScriptCache().remove("db_v181_no_tele");
+  return { ok: true, message: targetRow > 0 ? 'Data karyawan berhasil diperbarui.' : 'Data karyawan berhasil ditambahkan.' };
+}
+
+function deleteAdminEmployeeByNik(nik) {
+  var key = String(nik || '').trim();
+  if (!key) return { ok: false, message: 'NIK wajib diisi.' };
+  var ss = getDB();
+  var sh = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
+  if (!sh) return { ok: false, message: 'Sheet DB_Karyawan / Master_Karyawan tidak ditemukan.' };
+  var values = sh.getDataRange().getValues();
+  if (!values || values.length < 2) return { ok: false, message: 'Data karyawan kosong.' };
+  var idx = getDbKaryawanIndexMap(values[0] || []);
+  for (var r = values.length - 1; r >= 1; r--) {
+    if (String((values[r] && values[r][idx.nik]) || '').trim() === key) {
+      sh.deleteRow(r + 1);
+      CacheService.getScriptCache().remove("db_v181_no_tele");
+      return { ok: true, message: 'Data karyawan berhasil dihapus.' };
+    }
+  }
+  return { ok: false, message: 'NIK tidak ditemukan.' };
+}
+
 function getEmployeeDirectoryData() {
   var rows = getEmployeeMasterData();
   if (!rows || rows.length === 0) {
