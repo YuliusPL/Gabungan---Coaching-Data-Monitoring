@@ -48,6 +48,10 @@
             <i class="bi bi-funnel-fill"></i>
             <span>Pipeline</span>
           </button>
+          <button class="quick-tab quick-report" onclick="switchPage('report')">
+            <i class="bi bi-file-earmark-text-fill"></i>
+            <span>Report</span>
+          </button>
           <button class="quick-tab quick-coaching" onclick="switchPage('coaching')">
             <i class="bi bi-person-badge-fill"></i>
             <span>Coaching</span>
@@ -77,6 +81,12 @@
         <section class="page-panel" id="panel-coaching">
           <div class="page-scroll">
             <?!= include('Coaching'); ?>
+          </div>
+        </section>
+
+        <section class="page-panel" id="panel-report">
+          <div class="page-scroll">
+            <?!= include('Report'); ?>
           </div>
         </section>
 
@@ -130,6 +140,10 @@
     <button onclick="switchPage('pipe')" class="nav-item" id="n-pipe">
       <span class="nav-icon nav-pipe"><i class="bi bi-funnel-fill"></i></span>
       <span class="nav-text">Pipeline</span>
+    </button>
+    <button onclick="switchPage('report')" class="nav-item" id="n-report">
+      <span class="nav-icon nav-report"><i class="bi bi-file-earmark-text-fill"></i></span>
+      <span class="nav-text">Report</span>
     </button>
     <button onclick="switchPage('coaching')" class="nav-item" id="n-coaching">
       <span class="nav-icon nav-coaching"><i class="bi bi-person-badge-fill"></i></span>

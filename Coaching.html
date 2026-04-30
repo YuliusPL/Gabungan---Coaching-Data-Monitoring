@@ -21,60 +21,6 @@
     </button>
   </div>
 
-  <div class="card-mewah coaching-report-card mt-3">
-    <div class="card-title-row">
-      <div>
-        <span class="eyebrow">Laporan</span>
-        <h3>Riwayat &amp; laporan coaching</h3>
-      </div>
-      <i class="bi bi-file-earmark-spreadsheet card-watermark"></i>
-    </div>
-    <p class="coaching-report-hint">
-      Kolom laporan mengikuti struktur sheet <b>Raw_Coaching</b> (sama dengan template Excel internal). Untuk menyamakan 100% dengan file
-      <b>Form Coaching Chat (Final).xlsx</b>, sesuaikan urutan header di sheet tersebut dengan urutan ekspor di bawah.
-    </p>
-    <div class="coaching-report-toolbar">
-      <div class="coaching-report-filters">
-        <div class="form-group mb-0">
-          <label class="form-label-lite">Dari tanggal</label>
-          <input type="date" id="coaching-report-from" class="form-control form-control-sm">
-        </div>
-        <div class="form-group mb-0">
-          <label class="form-label-lite">Sampai tanggal</label>
-          <input type="date" id="coaching-report-to" class="form-control form-control-sm">
-        </div>
-        <div class="form-group mb-0 span-2">
-          <label class="form-label-lite">Cari (ID, NIK, nama, cabang, topik…)</label>
-          <input type="text" id="coaching-report-search" class="form-control form-control-sm" placeholder="Kata kunci" onkeyup="debounceCoachingReportFilter()">
-        </div>
-      </div>
-      <div class="coaching-report-actions">
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="renderCoachingReportPreview()">
-          <i class="bi bi-arrow-repeat me-1"></i>Terapkan filter
-        </button>
-        <button type="button" class="btn btn-sm btn-coaching-quick" onclick="downloadCoachingReportExcel()">
-          <i class="bi bi-file-earmark-excel me-1"></i>Excel
-        </button>
-        <button type="button" class="btn btn-sm btn-coaching-quick" onclick="downloadCoachingReportPdf()">
-          <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-dark" onclick="printCoachingReportPreview()">
-          <i class="bi bi-printer me-1"></i>Print
-        </button>
-      </div>
-    </div>
-    <div class="table-scroll coaching-report-scroll">
-      <table class="table table-sm table-hover mb-0 data-table coaching-report-table" id="coaching-report-table">
-        <thead id="coaching-report-thead">
-          <tr></tr>
-        </thead>
-        <tbody id="coaching-report-tbody">
-          <tr><td class="empty-state">Memuat riwayat coaching…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
   <div class="coaching-region-card-grid" id="coaching-region-card-grid">
     <div class="coaching-region-card">
       <strong>0</strong>

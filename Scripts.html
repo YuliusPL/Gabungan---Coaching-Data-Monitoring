@@ -17,8 +17,8 @@
   const coachingRegionBuckets = ['REGION 1', 'REGION 2', 'REGION 3', 'REGION 4', 'LAINNYA'];
   let currentPage = 'home';
 
-  const pageOrder = ['home', 'pipe', 'coaching', 'admin'];
-  const pageIndexMap = { home: 0, pipe: 1, coaching: 2, admin: 3 };
+  const pageOrder = ['home', 'pipe', 'coaching', 'report', 'admin'];
+  const pageIndexMap = { home: 0, pipe: 1, coaching: 2, report: 3, admin: 4 };
   const storageKey = 'cc_modular_no_tele_v1';
 
   function initApp() {
@@ -605,6 +605,7 @@
       home: 'Ringkasan performa, achievement, dan pencairan',
       pipe: 'Monitoring funnel, aging, dan kualitas pipeline',
       coaching: 'Pendampingan staff dan tindak lanjut coaching',
+      report: 'Laporan riwayat coaching, export PDF/Excel, dan notifikasi',
       admin: 'Pusat unggah data dan kontrol pembaruan dashboard'
     };
 
