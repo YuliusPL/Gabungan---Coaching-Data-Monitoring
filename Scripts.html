@@ -3,6 +3,7 @@
   let dbCoaching = { master: [], coaching: [], progress: [] };
   let dbAdminEmployee = { headers: [], rows: [], total: 0 };
   let adminUserDirectory = { records: [], byNik: {}, byName: {}, branches: [] };
+  let adminEmployeeLookup = { byNik: {}, byName: {}, branches: [] };
   let adminEmployeeViewRows = [];
   let adminKaryawanEditMode = 'add';
   let adminKaryawanOriginalNik = '';
@@ -717,6 +718,7 @@
         const headers = Array.isArray(payload.headers) ? payload.headers : [];
         const rows = Array.isArray(payload.rows) ? payload.rows : [];
         dbAdminEmployee = { headers, rows, summary: payload.summary || {}, idxMap: payload.indexMap || payload.idxMap || {} };
+        prepareAdminEmployeeEditorSources(rows);
         renderAdminKaryawanTable();
       })
       .withFailureHandler(err => {
@@ -724,6 +726,38 @@
         Swal.fire('Error', err && err.message ? err.message : 'Gagal memuat data karyawan', 'error');
       })
       .getAdminEmployeeData();
+  }
+
+  function prepareAdminEmployeeEditorSources(rows) {
+    const byNik = {};
+    const byName = {};
+    const branchSet = {};
+    (rows || []).forEach(rec => {
+      const nik = String((rec && rec.nik) || '').trim();
+      const nama = String((rec && rec.nama) || '').trim();
+      const cab = String((rec && rec.cabang) || '').trim();
+      if (nik && !byNik[nik]) byNik[nik] = rec;
+      if (nama) byName[nama.toUpperCase()] = rec;
+      if (cab) branchSet[cab.toUpperCase()] = cab;
+    });
+    adminEmployeeLookup = {
+      byNik,
+      byName,
+      branches: Object.keys(branchSet).sort().map(k => branchSet[k])
+    };
+
+    const nikList = document.getElementById('adm-form-nik-list');
+    const namaList = document.getElementById('adm-form-nama-list');
+    const cabangList = document.getElementById('adm-form-cabang-list');
+    if (nikList) {
+      nikList.innerHTML = Object.keys(byNik).sort().map(nik => `<option value="${escapeHtml(nik)}"></option>`).join('');
+    }
+    if (namaList) {
+      namaList.innerHTML = Object.keys(byName).sort().map(name => `<option value="${escapeHtml(byName[name].nama || '')}"></option>`).join('');
+    }
+    if (cabangList) {
+      cabangList.innerHTML = (adminEmployeeLookup.branches || []).map(cab => `<option value="${escapeHtml(cab)}"></option>`).join('');
+    }
   }
 
   function renderAdminKaryawanTable() {
@@ -940,6 +974,26 @@
 
   function resetAdminEmployeeForm() {
     openAdminEmployeeCreate();
+  }
+
+  function onAdminAtasanNikChange(level) {
+    const lv = Number(level) === 2 ? 2 : 1;
+    const nikId = lv === 2 ? 'adm-form-nik-atasan2' : 'adm-form-nik-atasan';
+    const namaId = lv === 2 ? 'adm-form-nama-atasan2' : 'adm-form-nama-atasan';
+    const nikVal = String(getValue(nikId) || '').trim();
+    const rec = adminEmployeeLookup.byNik ? adminEmployeeLookup.byNik[nikVal] : null;
+    if (!rec) return;
+    setValue(namaId, rec.nama || '');
+  }
+
+  function onAdminAtasanNamaChange(level) {
+    const lv = Number(level) === 2 ? 2 : 1;
+    const nikId = lv === 2 ? 'adm-form-nik-atasan2' : 'adm-form-nik-atasan';
+    const namaId = lv === 2 ? 'adm-form-nama-atasan2' : 'adm-form-nama-atasan';
+    const namaVal = String(getValue(namaId) || '').trim().toUpperCase();
+    const rec = adminEmployeeLookup.byName ? adminEmployeeLookup.byName[namaVal] : null;
+    if (!rec) return;
+    setValue(nikId, rec.nik || '');
   }
 
   function formatInputDate(value) {

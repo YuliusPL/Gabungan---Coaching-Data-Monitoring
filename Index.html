@@ -214,27 +214,35 @@
                       </div>
                       <div class="col-12 col-md-6">
                         <label class="form-label-lite">Cabang / Lokasi</label>
-                        <input type="text" id="adm-form-cabang" class="form-control input-elegant">
+                        <input type="text" id="adm-form-cabang" class="form-control input-elegant" list="adm-form-cabang-list" placeholder="Pilih / ketik cabang">
+                        <datalist id="adm-form-cabang-list"></datalist>
                       </div>
                       <div class="col-12 col-md-6">
                         <label class="form-label-lite">Role User</label>
-                        <input type="text" id="adm-form-role-user" class="form-control input-elegant">
+                        <select id="adm-form-role-user" class="form-select input-elegant">
+                          <option value="">Pilih Role</option>
+                          <option value="ADMIN">ADMIN</option>
+                          <option value="HEAD">HEAD</option>
+                          <option value="BM">BM</option>
+                          <option value="SUPERVISOR">SUPERVISOR</option>
+                          <option value="STAFF">STAFF</option>
+                        </select>
                       </div>
                       <div class="col-12 col-md-4">
                         <label class="form-label-lite">NIK Atasan Langsung</label>
-                        <input type="text" id="adm-form-nik-atasan" class="form-control input-elegant">
+                        <input type="text" id="adm-form-nik-atasan" class="form-control input-elegant" list="adm-form-nik-list" placeholder="Cari NIK Atasan" oninput="onAdminAtasanNikChange(1)" onchange="onAdminAtasanNikChange(1)">
                       </div>
                       <div class="col-12 col-md-8">
                         <label class="form-label-lite">Nama Atasan Langsung</label>
-                        <input type="text" id="adm-form-nama-atasan" class="form-control input-elegant">
+                        <input type="text" id="adm-form-nama-atasan" class="form-control input-elegant" list="adm-form-nama-list" placeholder="Cari Nama Atasan" oninput="onAdminAtasanNamaChange(1)" onchange="onAdminAtasanNamaChange(1)">
                       </div>
                       <div class="col-12 col-md-4">
                         <label class="form-label-lite">NIK Atasan Level 2</label>
-                        <input type="text" id="adm-form-nik-atasan2" class="form-control input-elegant">
+                        <input type="text" id="adm-form-nik-atasan2" class="form-control input-elegant" list="adm-form-nik-list" placeholder="Cari NIK Atasan Level 2" oninput="onAdminAtasanNikChange(2)" onchange="onAdminAtasanNikChange(2)">
                       </div>
                       <div class="col-12 col-md-8">
                         <label class="form-label-lite">Nama Atasan Level 2</label>
-                        <input type="text" id="adm-form-nama-atasan2" class="form-control input-elegant">
+                        <input type="text" id="adm-form-nama-atasan2" class="form-control input-elegant" list="adm-form-nama-list" placeholder="Cari Nama Atasan Level 2" oninput="onAdminAtasanNamaChange(2)" onchange="onAdminAtasanNamaChange(2)">
                       </div>
                       <div class="col-12 col-md-6">
                         <label class="form-label-lite">Email Karyawan</label>
@@ -263,6 +271,8 @@
                         <i class="bi bi-x-circle me-1"></i>Batal
                       </button>
                     </div>
+                    <datalist id="adm-form-nik-list"></datalist>
+                    <datalist id="adm-form-nama-list"></datalist>
                   </div>
                 </div>
               </div>
