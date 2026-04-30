@@ -30,24 +30,29 @@
   const storageKey = 'cc_modular_no_tele_v1';
 
   function initApp() {
-    setDefaultDates();
-    setupSwipeNavigation();
+    try {
+      setDefaultDates();
+      setupSwipeNavigation();
 
-    const stored = sessionStorage.getItem(storageKey);
-    if (stored) {
-      try {
-        db = JSON.parse(stored);
-        renderUI();
-        hideLoader();
-        fetchCoachingAddon();
-        switchPage('home', true);
-        return;
-      } catch (e) {
-        sessionStorage.removeItem(storageKey);
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored) {
+        try {
+          db = JSON.parse(stored);
+          renderUI();
+          hideLoader();
+          fetchCoachingAddon();
+          switchPage('home', true);
+          return;
+        } catch (e) {
+          sessionStorage.removeItem(storageKey);
+        }
       }
-    }
 
-    fetchDB();
+      fetchDB();
+    } catch (e) {
+      hideLoader();
+      Swal.fire('Error', e && e.message ? e.message : 'Terjadi kesalahan saat inisialisasi aplikasi', 'error');
+    }
   }
 
   function setDefaultDates() {
@@ -79,12 +84,17 @@
   function fetchDB() {
     google.script.run
       .withSuccessHandler(res => {
-        db = res || db;
-        sessionStorage.setItem(storageKey, JSON.stringify(db));
-        renderUI();
-        hideLoader();
-        fetchCoachingAddon();
-        switchPage(currentPage, true);
+        try {
+          db = res || db;
+          sessionStorage.setItem(storageKey, JSON.stringify(db));
+          renderUI();
+          hideLoader();
+          fetchCoachingAddon();
+          switchPage(currentPage, true);
+        } catch (e) {
+          hideLoader();
+          Swal.fire('Error', e && e.message ? e.message : 'Gagal menampilkan data dashboard', 'error');
+        }
       })
       .withFailureHandler(err => {
         hideLoader();
