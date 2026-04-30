@@ -836,6 +836,18 @@ function getAuthUserByNik(nik, password) {
   return { ok: false, message: 'NIK tidak ditemukan.' };
 }
 
+function loginInternalUser(payload) {
+  payload = payload || {};
+  var nik = String(payload.nik || '').trim();
+  var password = String(payload.password || '');
+  var auth = getAuthUserByNik(nik, password);
+  if (!auth.ok) return auth;
+  return {
+    ok: true,
+    user: auth.user
+  };
+}
+
 function getDashboardDataByAuth(nik, password) {
   var auth = getAuthUserByNik(nik, password);
   if (!auth.ok) return { ok: false, message: auth.message || 'Login gagal.' };

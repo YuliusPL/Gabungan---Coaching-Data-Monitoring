@@ -215,8 +215,13 @@
       return;
     }
     Swal.fire({ title: 'Memproses login...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    const timeoutGuard = setTimeout(() => {
+      Swal.close();
+      Swal.fire('Timeout', 'Permintaan login terlalu lama. Coba lagi.', 'warning');
+    }, 15000);
     google.script.run
       .withSuccessHandler(res => {
+        clearTimeout(timeoutGuard);
         Swal.close();
         const out = res || {};
         if (!out.ok) {
@@ -229,10 +234,11 @@
         initApp();
       })
       .withFailureHandler(err => {
+        clearTimeout(timeoutGuard);
         Swal.close();
         Swal.fire('Error', err && err.message ? err.message : 'Gagal login', 'error');
       })
-      .loginInternalUser({ nik, password });
+      .getDashboardDataByAuth(nik, password);
   }
 
   function registerInternalFromLogin() {
