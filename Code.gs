@@ -204,3 +204,102 @@ function saveCoachingAction(obj) {
   ]);
   return "Berhasil";
 }
+
+/** Kolom laporan: sama urutannya dengan header Raw_Coaching (untuk ekspor Excel/PDF). */
+function getCoachingReportColumnKeys() {
+  return [
+    "ID",
+    "Tanggal",
+    "Cabang",
+    "Nama",
+    "Root Cause",
+    "Topic",
+    "Target",
+    "Status",
+    "ParentID",
+    "BM/RH",
+    "Region",
+    "LastPerf",
+    "NIK",
+    "Jabatan",
+    "Satuan Target",
+    "Target Date",
+    "How",
+    "Result",
+    "Feedback"
+  ];
+}
+
+/**
+ * Ambil email atasan per cabang dari DB_Region / MASTER_REGION.
+ * Tambahkan kolom header yang mengandung "email" (mis. EMAIL_BM, EMAIL ATASAN).
+ */
+function resolveSupervisorEmailForBranch(cabangUpper) {
+  var key = String(cabangUpper || "").trim().toUpperCase();
+  if (!key) return "";
+  var ss = getDB();
+  var sh = ss.getSheetByName("DB_Region") || ss.getSheetByName("MASTER_REGION");
+  if (!sh || sh.getLastRow() < 2) return "";
+  var rows = sh.getDataRange().getValues();
+  var hdr = rows[0];
+  var idxCab = -1;
+  var idxEmail = -1;
+  for (var c = 0; c < hdr.length; c++) {
+    var lab = String(hdr[c] || "").toLowerCase();
+    if (lab.indexOf("cabang") !== -1 || lab.indexOf("branch") !== -1) idxCab = c;
+    if (lab.indexOf("email") !== -1) idxEmail = c;
+  }
+  if (idxCab < 0) idxCab = 0;
+  if (idxEmail < 0) return "";
+  for (var i = 1; i < rows.length; i++) {
+    var cab = String(rows[i][idxCab] || "").trim().toUpperCase();
+    if (cab === key) {
+      var em = String(rows[i][idxEmail] || "").trim();
+      if (em.indexOf("@") !== -1) return em;
+    }
+  }
+  return "";
+}
+
+/**
+ * Kirim pengingat coaching ke email atasan cabang (jika kolom email di sheet region terisi),
+ * atau ke email user aktif sebagai fallback.
+ */
+function sendCoachingReminderEmail(payload) {
+  payload = payload || {};
+  var cabang = String(payload.cabang || "").trim();
+  var subject = String(payload.subject || "Pengingat Coaching BPR KS").trim();
+  var body = String(payload.body || "").trim();
+  if (!body) return "Isi pesan kosong.";
+
+  var to = resolveSupervisorEmailForBranch(cabang.toUpperCase());
+  if (!to) {
+    try {
+      to = Session.getActiveUser().getEmail();
+    } catch (e) {
+      to = "";
+    }
+  }
+  if (!to) return "Tidak ada alamat email (isi kolom Email di DB_Region/MASTER_REGION atau login Google).";
+
+  MailApp.sendEmail({
+    to: to,
+    subject: subject,
+    body: body
+  });
+  return "Email terkirim ke " + to;
+}
+
+/** Kirim beberapa pengingat sekaligus (satu email per item, mis. per cabang). */
+function sendCoachingReminderBatch(items) {
+  items = items || [];
+  var results = [];
+  for (var i = 0; i < items.length; i++) {
+    try {
+      results.push(sendCoachingReminderEmail(items[i] || {}));
+    } catch (e) {
+      results.push("Error: " + e.message);
+    }
+  }
+  return results;
+}
