@@ -270,7 +270,7 @@ function sendCoachingReminderEmail(payload) {
   var cabang = String(payload.cabang || "").trim();
   var subject = String(payload.subject || "Pengingat Coaching BPR KS").trim();
   var body = String(payload.body || "").trim();
-  if (!body) return "Isi pesan kosong.";
+  if (!body) return { ok: false, cabang: cabang, to: "", message: "Isi pesan kosong." };
 
   var to = resolveSupervisorEmailForBranch(cabang.toUpperCase());
   if (!to) {
@@ -280,14 +280,25 @@ function sendCoachingReminderEmail(payload) {
       to = "";
     }
   }
-  if (!to) return "Tidak ada alamat email (isi kolom Email di DB_Region/MASTER_REGION atau login Google).";
+  if (!to) {
+    return {
+      ok: false,
+      cabang: cabang,
+      to: "",
+      message: "Tidak ada alamat email (isi kolom Email di DB_Region/MASTER_REGION atau login Google)."
+    };
+  }
 
-  MailApp.sendEmail({
-    to: to,
-    subject: subject,
-    body: body
-  });
-  return "Email terkirim ke " + to;
+  try {
+    MailApp.sendEmail({
+      to: to,
+      subject: subject,
+      body: body
+    });
+    return { ok: true, cabang: cabang, to: to, message: "Email terkirim." };
+  } catch (e) {
+    return { ok: false, cabang: cabang, to: to, message: e.message || String(e) };
+  }
 }
 
 /** Kirim beberapa pengingat sekaligus (satu email per item, mis. per cabang). */
@@ -295,11 +306,7 @@ function sendCoachingReminderBatch(items) {
   items = items || [];
   var results = [];
   for (var i = 0; i < items.length; i++) {
-    try {
-      results.push(sendCoachingReminderEmail(items[i] || {}));
-    } catch (e) {
-      results.push("Error: " + e.message);
-    }
+    results.push(sendCoachingReminderEmail(items[i] || {}));
   }
   return results;
 }

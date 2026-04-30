@@ -1662,21 +1662,52 @@
       return;
     }
 
-    Swal.fire({
-      title: 'Mengirim email…',
-      allowOutsideClick: false,
-      didOpen: () => Swal.showLoading()
-    });
+    const previewLines = items.slice(0, 8).map((it, idx) =>
+      `${idx + 1}. Cabang: ${it.cabang || '-'}\nKepada: auto by cabang (DB_Region/MASTER_REGION)\nSubject: ${it.subject}`
+    );
+    const more = items.length > 8 ? `\n... dan ${items.length - 8} cabang lainnya` : '';
+    const previewText = `Total email: ${items.length}\n\n${previewLines.join('\n\n')}${more}\n\nLanjut kirim?`;
 
-    google.script.run
-      .withSuccessHandler(res => {
-        const msg = Array.isArray(res) ? res.join('\n') : String(res);
-        Swal.fire('Selesai', msg, 'success');
-      })
-      .withFailureHandler(err => {
-        Swal.fire('Error', err && err.message ? err.message : 'Gagal mengirim email', 'error');
-      })
-      .sendCoachingReminderBatch(items);
+    Swal.fire({
+      title: 'Preview notifikasi',
+      text: previewText,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Kirim sekarang',
+      cancelButtonText: 'Batal',
+      width: 700
+    }).then(result => {
+      if (!result.isConfirmed) return;
+
+      Swal.fire({
+        title: 'Mengirim email...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      google.script.run
+        .withSuccessHandler(res => {
+          const results = Array.isArray(res) ? res : [];
+          const ok = results.filter(r => r && r.ok).length;
+          const fail = results.length - ok;
+          const details = results.slice(0, 10).map((r, i) => {
+            const cab = (r && r.cabang) || '-';
+            const to = (r && r.to) || '-';
+            const status = r && r.ok ? 'OK' : 'GAGAL';
+            const msg = (r && r.message) || '-';
+            return `${i + 1}. [${status}] ${cab} -> ${to}\n${msg}`;
+          }).join('\n\n');
+          const tail = results.length > 10 ? `\n\n... dan ${results.length - 10} hasil lainnya` : '';
+          const text = `Berhasil: ${ok}\nGagal: ${fail}\n\n${details}${tail}`;
+
+          if (ok > 0) Swal.fire('Proses selesai', text, fail > 0 ? 'warning' : 'success');
+          else Swal.fire('Semua gagal', text, 'error');
+        })
+        .withFailureHandler(err => {
+          Swal.fire('Error', err && err.message ? err.message : 'Gagal mengirim email', 'error');
+        })
+        .sendCoachingReminderBatch(items);
+    });
   }
 
   function debounceSearch() {
