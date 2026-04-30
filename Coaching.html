@@ -241,4 +241,42 @@
       </button>
     </div>
   </div>
+
+  <div class="card-mewah coaching-reminder-card mt-3">
+    <div class="card-title-row">
+      <div>
+        <span class="eyebrow">Notifikasi</span>
+        <h3>Pengingat untuk atasan</h3>
+      </div>
+      <i class="bi bi-bell-fill card-watermark"></i>
+    </div>
+    <p class="coaching-reminder-intro">
+      Ringkasan otomatis: karyawan yang perlu coaching (belum pernah / belum ada sesi dalam 30 hari terakhir, status bukan DONE), dan sesi dengan <b>Target Date</b> 7 hari ke depan.
+      Klik tombol kirim untuk melihat dahulu tujuan email + narasi, lalu konfirmasi kirim.
+    </p>
+    <div class="coaching-reminder-grid">
+      <div class="coaching-reminder-box">
+        <div class="coaching-reminder-box-head">
+          <span>Perlu coaching (30 hari)</span>
+          <button type="button" class="btn btn-sm btn-coaching-quick" onclick="sendCoachingReminderDigest('stale')">
+            <i class="bi bi-envelope me-1"></i>Preview & kirim
+          </button>
+        </div>
+        <div id="coaching-reminder-stale" class="coaching-reminder-list">
+          <div class="empty-state small">Memuat...</div>
+        </div>
+      </div>
+      <div class="coaching-reminder-box">
+        <div class="coaching-reminder-box-head">
+          <span>Target date mendekati (7 hari)</span>
+          <button type="button" class="btn btn-sm btn-coaching-quick" onclick="sendCoachingReminderDigest('target')">
+            <i class="bi bi-envelope me-1"></i>Preview & kirim
+          </button>
+        </div>
+        <div id="coaching-reminder-target" class="coaching-reminder-list">
+          <div class="empty-state small">Memuat...</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>

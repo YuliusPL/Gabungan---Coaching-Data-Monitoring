@@ -17,8 +17,8 @@
   const coachingRegionBuckets = ['REGION 1', 'REGION 2', 'REGION 3', 'REGION 4', 'LAINNYA'];
   let currentPage = 'home';
 
-  const pageOrder = ['home', 'pipe', 'coaching', 'admin'];
-  const pageIndexMap = { home: 0, pipe: 1, coaching: 2, admin: 3 };
+  const pageOrder = ['home', 'pipe', 'coaching', 'report', 'admin'];
+  const pageIndexMap = { home: 0, pipe: 1, coaching: 2, report: 3, admin: 4 };
   const storageKey = 'cc_modular_no_tele_v1';
 
   function initApp() {
@@ -605,6 +605,7 @@
       home: 'Ringkasan performa, achievement, dan pencairan',
       pipe: 'Monitoring funnel, aging, dan kualitas pipeline',
       coaching: 'Pendampingan staff dan tindak lanjut coaching',
+      report: 'Laporan riwayat coaching, export PDF/Excel, dan notifikasi',
       admin: 'Pusat unggah data dan kontrol pembaruan dashboard'
     };
 
@@ -715,7 +716,7 @@
     if (satuanRows.length > 0) {
       const startIdx = satuanRows.length > 1 ? 1 : 0;
       const opts = satuanRows.slice(startIdx)
-        .map(r => String((r && r[0]) || '').trim())
+        .map(r => String((r && r[1]) || '').trim())
         .filter(Boolean);
       coachingSatuanOptions = [...new Set(opts)];
     }
@@ -748,6 +749,9 @@
     applyCoachingLastFocus();
     renderCoachingDashboard();
     sortCoachingInteractive(currentSort.col || 'nama', true);
+    initCoachingReportDates();
+    renderCoachingReportPreview();
+    renderCoachingReminders();
   }
 
   function applyCoachingLastFocus() {
@@ -780,6 +784,11 @@
 
       const latest = coachData[0] || null;
       const status = getCoachingStatus(latest);
+      let lastCoachingMs = null;
+      if (latest && latest[1]) {
+        const d = new Date(latest[1]);
+        if (!isNaN(d.getTime())) lastCoachingMs = d.getTime();
+      }
 
       const normalized = normalizeStaffPlacement(
         String(m[idxJab] || '').trim(),
@@ -798,7 +807,8 @@
         status,
         lastId: latest ? String(latest[0] || '') : '',
         lastDate: latest ? formatDisplayDate(latest[1]) : '-',
-        lastTopic: latest ? String(latest[5] || '') : ''
+        lastTopic: latest ? String(latest[5] || '') : '',
+        lastCoachingMs
       });
     });
 
@@ -1295,6 +1305,410 @@
       .forEach(id => setValue(id, ''));
     setValue('c-row-mode', 'new');
     toggleFollowUpFields(false);
+  }
+
+  /** Urutan kolom = sheet Raw_Coaching / ekspor laporan (samakan dengan template Excel Anda). */
+  const COACHING_REPORT_HEADERS = [
+    'ID',
+    'Tanggal',
+    'Cabang',
+    'Nama',
+    'Root Cause',
+    'Topic',
+    'Target',
+    'Status',
+    'ParentID',
+    'BM/RH',
+    'Region',
+    'LastPerf',
+    'NIK',
+    'Jabatan',
+    'Satuan Target',
+    'Target Date',
+    'How',
+    'Result',
+    'Feedback'
+  ];
+
+  const COACHING_STALE_DAYS = 30;
+  const COACHING_TARGET_WINDOW_DAYS = 7;
+  let coachingReportSearchTimer = null;
+
+  function getCoachingHistoryRawRows() {
+    const data = dbCoaching.coaching || [];
+    if (data.length < 2) return [];
+    return data.slice(1).map(raw => ({
+      raw,
+      tanggalMs: parseCoachingRowDateMs(raw[1])
+    }));
+  }
+
+  function parseCoachingRowDateMs(v) {
+    if (v == null || v === '') return null;
+    const d = v instanceof Date ? v : new Date(v);
+    if (isNaN(d.getTime())) return null;
+    return d.getTime();
+  }
+
+  function getFilteredCoachingReportRows() {
+    const fromVal = getValue('coaching-report-from');
+    const toVal = getValue('coaching-report-to');
+    const kw = (getValue('coaching-report-search') || '').toLowerCase().trim();
+    const fromMs = fromVal ? new Date(fromVal + 'T00:00:00').getTime() : null;
+    const toMs = toVal ? new Date(toVal + 'T23:59:59').getTime() : null;
+
+    return getCoachingHistoryRawRows()
+      .filter(item => {
+        const ms = item.tanggalMs;
+        if (fromMs != null && (ms == null || ms < fromMs)) return false;
+        if (toMs != null && (ms == null || ms > toMs)) return false;
+        if (!kw) return true;
+        const line = (item.raw || []).map(x => String(x ?? '')).join(' ').toLowerCase();
+        return line.includes(kw);
+      })
+      .sort((a, b) => (b.tanggalMs || 0) - (a.tanggalMs || 0));
+  }
+
+  function formatReportCell(v) {
+    if (v == null || v === '') return '';
+    if (v instanceof Date) {
+      return v.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    if (typeof v === 'object' && v && typeof v.getTime === 'function') {
+      const d = new Date(v.getTime ? v.getTime() : v);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      }
+    }
+    const s = String(v);
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      }
+    }
+    return s;
+  }
+
+  function initCoachingReportDates() {
+    const fromEl = document.getElementById('coaching-report-from');
+    const toEl = document.getElementById('coaching-report-to');
+    if (!fromEl || !toEl) return;
+    if (fromEl.dataset.initialized === '1') return;
+
+    const rows = getCoachingHistoryRawRows();
+    let minMs = null;
+    let maxMs = null;
+    rows.forEach(r => {
+      if (r.tanggalMs == null) return;
+      if (minMs == null || r.tanggalMs < minMs) minMs = r.tanggalMs;
+      if (maxMs == null || r.tanggalMs > maxMs) maxMs = r.tanggalMs;
+    });
+
+    const fmt = d => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const today = new Date();
+    if (minMs != null && maxMs != null) {
+      fromEl.value = fmt(new Date(minMs));
+      toEl.value = fmt(new Date(maxMs));
+    } else {
+      const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 90);
+      fromEl.value = fmt(start);
+      toEl.value = fmt(today);
+    }
+    fromEl.dataset.initialized = '1';
+  }
+
+  function debounceCoachingReportFilter() {
+    clearTimeout(coachingReportSearchTimer);
+    coachingReportSearchTimer = setTimeout(() => renderCoachingReportPreview(), 280);
+  }
+
+  function renderCoachingReportPreview() {
+    const thead = document.getElementById('coaching-report-thead');
+    const tbody = document.getElementById('coaching-report-tbody');
+    if (!thead || !tbody) return;
+
+    const filtered = getFilteredCoachingReportRows();
+    thead.innerHTML = `<tr>${COACHING_REPORT_HEADERS.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>`;
+
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="${COACHING_REPORT_HEADERS.length}" class="empty-state">Tidak ada data pada filter ini.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(item => {
+      const r = item.raw;
+      const cells = COACHING_REPORT_HEADERS.map((_, i) => `<td>${escapeHtml(formatReportCell(r[i]))}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+  }
+
+  function downloadCoachingReportExcel() {
+    const filtered = getFilteredCoachingReportRows();
+    if (!filtered.length) {
+      Swal.fire('Info', 'Tidak ada data untuk diekspor.', 'info');
+      return;
+    }
+    const aoa = [
+      COACHING_REPORT_HEADERS,
+      ...filtered.map(item => COACHING_REPORT_HEADERS.map((_, i) => {
+        const v = item.raw[i];
+        if (v instanceof Date) return v;
+        if (v != null && String(v).length < 24 && !isNaN(new Date(v).getTime()) && /^\d{4}-\d{2}-\d{2}/.test(String(v))) {
+          return new Date(v);
+        }
+        return v;
+      }))
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Coaching');
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `laporan-coaching-${stamp}.xlsx`);
+  }
+
+  function downloadCoachingReportPdf() {
+    const filtered = getFilteredCoachingReportRows();
+    if (!filtered.length) {
+      Swal.fire('Info', 'Tidak ada data untuk diekspor.', 'info');
+      return;
+    }
+    const jsPDF = window.jspdf && window.jspdf.jsPDF;
+    if (!jsPDF || typeof jsPDF !== 'function') {
+      Swal.fire('Error', 'Library jsPDF belum dimuat. Muat ulang halaman.', 'error');
+      return;
+    }
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const body = filtered.map(item => COACHING_REPORT_HEADERS.map((_, i) => formatReportCell(item.raw[i])));
+    doc.setFontSize(11);
+    doc.text('Laporan Coaching — BPR KS Command Center', 14, 12);
+    doc.setFontSize(8);
+    doc.setTextColor(80);
+    const rangeTxt = `${getValue('coaching-report-from') || '—'} s/d ${getValue('coaching-report-to') || '—'}`;
+    doc.text(`Periode: ${rangeTxt}  |  ${filtered.length} baris`, 14, 17);
+    doc.setTextColor(0);
+
+    doc.autoTable({
+      startY: 22,
+      head: [COACHING_REPORT_HEADERS],
+      body,
+      styles: { fontSize: 5.5, cellPadding: 0.6, overflow: 'linebreak' },
+      headStyles: { fillColor: [23, 63, 115], fontSize: 6 },
+      margin: { left: 10, right: 10 },
+      tableWidth: 'auto'
+    });
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    doc.save(`laporan-coaching-${stamp}.pdf`);
+  }
+
+  function printCoachingReportPreview() {
+    const tbl = document.getElementById('coaching-report-table');
+    if (!tbl) return;
+    const w = window.open('', '_blank');
+    if (!w) {
+      Swal.fire('Info', 'Izinkan pop-up untuk mencetak laporan.', 'info');
+      return;
+    }
+    w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Laporan Coaching</title>');
+    w.document.write('<style>body{font-family:system-ui,sans-serif;padding:16px;} table{border-collapse:collapse;width:100%;font-size:11px;} th,td{border:1px solid #334155;padding:6px 8px;} th{background:#173f73;color:#fff;}</style>');
+    w.document.write('</head><body><h2 style="margin:0 0 12px;">Laporan Coaching</h2>');
+    w.document.write(tbl.outerHTML);
+    w.document.write('</body></html>');
+    w.document.close();
+    w.focus();
+    setTimeout(() => {
+      w.print();
+      w.close();
+    }, 250);
+  }
+
+  function getStaleCoachingStaff() {
+    const now = Date.now();
+    const cutoff = now - COACHING_STALE_DAYS * 86400000;
+    return (coachingRows || []).filter(r => {
+      if (String(r.status || '').toUpperCase().includes('DONE')) return false;
+      if (r.lastCoachingMs == null) return true;
+      return r.lastCoachingMs < cutoff;
+    });
+  }
+
+  function getTargetDateApproachingRows() {
+    const coaching = dbCoaching.coaching || [];
+    if (coaching.length < 2) return [];
+    const hdr = coaching[0] || [];
+    const idxTargetDate = getHeaderIndex(hdr, ['target date', 'tanggal target'], 15);
+    const idxStatus = getHeaderIndex(hdr, ['status'], 7);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const limit = new Date(today);
+    limit.setDate(limit.getDate() + COACHING_TARGET_WINDOW_DAYS);
+
+    const out = [];
+    coaching.slice(1).forEach(raw => {
+      const st = String(raw[idxStatus] || '').toUpperCase();
+      if (st.includes('DONE')) return;
+
+      const rawTd = raw[idxTargetDate];
+      let d = null;
+      if (rawTd instanceof Date) d = new Date(rawTd.getTime());
+      else if (rawTd) d = new Date(rawTd);
+      if (!d || isNaN(d.getTime())) return;
+      d.setHours(0, 0, 0, 0);
+      if (d >= today && d <= limit) {
+        out.push({
+          raw,
+          targetMs: d.getTime(),
+          cabang: String(raw[2] || '').trim(),
+          nama: String(raw[3] || '').trim(),
+          topic: String(raw[5] || '').trim(),
+          targetDateStr: d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+        });
+      }
+    });
+    out.sort((a, b) => a.targetMs - b.targetMs);
+    return out;
+  }
+
+  function renderCoachingReminders() {
+    const elStale = document.getElementById('coaching-reminder-stale');
+    const elTarget = document.getElementById('coaching-reminder-target');
+    if (!elStale || !elTarget) return;
+
+    const stale = getStaleCoachingStaff();
+    if (!stale.length) {
+      elStale.innerHTML = '<div class="empty-state small">Tidak ada karyawan yang memenuhi kriteria 30 hari (atau semua DONE).</div>';
+    } else {
+      elStale.innerHTML = stale.slice(0, 80).map(r => `
+        <div class="coaching-reminder-line">
+          <strong>${escapeHtml(r.nama)}</strong>
+          <span>${escapeHtml(r.cab)} · ${escapeHtml(r.jab)} · ${escapeHtml(r.status)}</span>
+          <small>Terakhir: ${escapeHtml(r.lastDate)}</small>
+        </div>
+      `).join('') + (stale.length > 80 ? `<div class="empty-state small">+${stale.length - 80} lainnya…</div>` : '');
+    }
+
+    const approaching = getTargetDateApproachingRows();
+    if (!approaching.length) {
+      elTarget.innerHTML = '<div class="empty-state small">Tidak ada Target Date dalam 7 hari ke depan (status bukan DONE).</div>';
+    } else {
+      elTarget.innerHTML = approaching.slice(0, 80).map(x => `
+        <div class="coaching-reminder-line">
+          <strong>${escapeHtml(x.nama)}</strong>
+          <span>${escapeHtml(x.cabang)}${x.topic ? ' · ' + escapeHtml(x.topic) : ''}</span>
+          <small>Target Date: ${escapeHtml(x.targetDateStr)}</small>
+        </div>
+      `).join('') + (approaching.length > 80 ? `<div class="empty-state small">+${approaching.length - 80} lainnya…</div>` : '');
+    }
+  }
+
+  function sendCoachingReminderDigest(kind) {
+    const items = [];
+    if (kind === 'stale') {
+      const stale = getStaleCoachingStaff();
+      const byCab = {};
+      stale.forEach(r => {
+        const c = r.cab || '(Tanpa cabang)';
+        if (!byCab[c]) byCab[c] = [];
+        byCab[c].push(r);
+      });
+      Object.keys(byCab).sort().forEach(cab => {
+        const lines = byCab[cab]
+          .map(r => `- ${r.nama} (${r.jab}) — ${r.status} — terakhir coaching: ${r.lastDate}`)
+          .join('\n');
+        items.push({
+          cabang: cab,
+          subject: `[BPR KS] Pengingat coaching (30 hari) — ${cab}`,
+          body:
+            `Yth. Atasan / BM cabang ${cab},\n\n` +
+            `Berikut karyawan yang belum coaching atau belum ada sesi dalam ${COACHING_STALE_DAYS} hari terakhir (status bukan DONE):\n\n` +
+            `${lines}\n\n` +
+            `Mohon tindak lanjut melalui Executive Dashboard > Coaching.\n\n` +
+            `— Sistem otomatis BPR KS Command Center`
+        });
+      });
+    } else {
+      const approaching = getTargetDateApproachingRows();
+      const byCab = {};
+      approaching.forEach(x => {
+        const c = x.cabang || '(Tanpa cabang)';
+        if (!byCab[c]) byCab[c] = [];
+        byCab[c].push(x);
+      });
+      Object.keys(byCab).sort().forEach(cab => {
+        const lines = byCab[c]
+          .map(x => `- ${x.nama} — Target Date: ${x.targetDateStr}${x.topic ? ' — ' + x.topic : ''}`)
+          .join('\n');
+        items.push({
+          cabang: cab,
+          subject: `[BPR KS] Target coaching mendekati (${COACHING_TARGET_WINDOW_DAYS} hari) — ${cab}`,
+          body:
+            `Yth. Atasan / BM cabang ${cab},\n\n` +
+            `Berikut sesi coaching dengan Target Date dalam ${COACHING_TARGET_WINDOW_DAYS} hari ke depan:\n\n` +
+            `${lines}\n\n` +
+            `Mohon persiapan tindak lanjut.\n\n` +
+            `— Sistem otomatis BPR KS Command Center`
+        });
+      });
+    }
+
+    if (!items.length) {
+      Swal.fire('Info', 'Tidak ada data untuk dikirim pada kategori ini.', 'info');
+      return;
+    }
+
+    const previewLines = items.slice(0, 8).map((it, idx) =>
+      `${idx + 1}. Cabang: ${it.cabang || '-'}\nKepada: auto by cabang (DB_Region/MASTER_REGION)\nSubject: ${it.subject}`
+    );
+    const more = items.length > 8 ? `\n... dan ${items.length - 8} cabang lainnya` : '';
+    const previewText = `Total email: ${items.length}\n\n${previewLines.join('\n\n')}${more}\n\nLanjut kirim?`;
+
+    Swal.fire({
+      title: 'Preview notifikasi',
+      text: previewText,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Kirim sekarang',
+      cancelButtonText: 'Batal',
+      width: 700
+    }).then(result => {
+      if (!result.isConfirmed) return;
+
+      Swal.fire({
+        title: 'Mengirim email...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      google.script.run
+        .withSuccessHandler(res => {
+          const results = Array.isArray(res) ? res : [];
+          const ok = results.filter(r => r && r.ok).length;
+          const fail = results.length - ok;
+          const details = results.slice(0, 10).map((r, i) => {
+            const cab = (r && r.cabang) || '-';
+            const to = (r && r.to) || '-';
+            const status = r && r.ok ? 'OK' : 'GAGAL';
+            const msg = (r && r.message) || '-';
+            return `${i + 1}. [${status}] ${cab} -> ${to}\n${msg}`;
+          }).join('\n\n');
+          const tail = results.length > 10 ? `\n\n... dan ${results.length - 10} hasil lainnya` : '';
+          const text = `Berhasil: ${ok}\nGagal: ${fail}\n\n${details}${tail}`;
+
+          if (ok > 0) Swal.fire('Proses selesai', text, fail > 0 ? 'warning' : 'success');
+          else Swal.fire('Semua gagal', text, 'error');
+        })
+        .withFailureHandler(err => {
+          Swal.fire('Error', err && err.message ? err.message : 'Gagal mengirim email', 'error');
+        })
+        .sendCoachingReminderBatch(items);
+    });
   }
 
   function debounceSearch() {
