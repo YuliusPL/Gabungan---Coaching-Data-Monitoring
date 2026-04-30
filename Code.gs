@@ -150,6 +150,73 @@ function getCoachingFullData() {
   };
 }
 
+function getEmployeeMasterData() {
+  var ss = getDB();
+  var sh = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
+  if (!sh) return [];
+  return sh.getDataRange().getValues();
+}
+
+function getAdminEmployeeData() {
+  var rows = getEmployeeMasterData();
+  if (!rows || rows.length === 0) {
+    return {
+      headers: [],
+      rows: [],
+      summary: { total: 0, active: 0, nonActive: 0, regions: 0, branches: 0 }
+    };
+  }
+
+  var headers = rows[0] || [];
+  var dataRows = rows.slice(1);
+  var normalizedHeaders = headers.map(function(h) {
+    return String(h || '').toLowerCase();
+  });
+
+  function headerIndex(candidates, fallback) {
+    for (var i = 0; i < normalizedHeaders.length; i++) {
+      var h = normalizedHeaders[i];
+      var found = candidates.some(function(c) { return h.indexOf(c) !== -1; });
+      if (found) return i;
+    }
+    return fallback;
+  }
+
+  var idxRegion = headerIndex(['region', 'wilayah'], 0);
+  var idxBranch = headerIndex(['cabang', 'branch'], 1);
+  var idxStatus = headerIndex(['status', 'aktif'], -1);
+
+  var uniqueRegions = {};
+  var uniqueBranches = {};
+  var activeCount = 0;
+  var nonActiveCount = 0;
+
+  dataRows.forEach(function(r) {
+    var region = String((r && r[idxRegion]) || '').trim().toUpperCase();
+    var branch = String((r && r[idxBranch]) || '').trim().toUpperCase();
+    if (region) uniqueRegions[region] = true;
+    if (branch) uniqueBranches[branch] = true;
+
+    if (idxStatus >= 0) {
+      var status = String((r && r[idxStatus]) || '').trim().toUpperCase();
+      if (status === 'AKTIF' || status === 'ACTIVE') activeCount++;
+      else if (status) nonActiveCount++;
+    }
+  });
+
+  return {
+    headers: headers,
+    rows: dataRows,
+    summary: {
+      total: dataRows.length,
+      active: activeCount,
+      nonActive: nonActiveCount,
+      regions: Object.keys(uniqueRegions).length,
+      branches: Object.keys(uniqueBranches).length
+    }
+  };
+}
+
 function saveCoachingAction(obj) {
   var ss = getDB();
   var sh = ss.getSheetByName('Raw_Coaching') || ss.insertSheet('Raw_Coaching');

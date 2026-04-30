@@ -93,37 +93,119 @@
         <section class="page-panel" id="panel-admin">
           <div class="page-scroll">
             <div id="v-admin">
-              <div class="card-mewah card-admin shadow-sm">
-                <div class="section-chip admin-chip">Admin Center</div>
-                <h6 class="section-title-main">Upload Data Excel</h6>
-                <p class="section-desc">Unggah data harian achievement, pencairan, atau pipeline dengan format Excel/CSV.</p>
+              <div class="section-hero section-hero-admin">
+                <div>
+                  <span class="section-chip admin-chip">Admin Center</span>
+                  <h2>Kelola data master dashboard</h2>
+                  <p>Manajemen Data Karyawan, User Management, dan Upload Data Excel dalam satu tempat.</p>
+                </div>
+                <div class="hero-icon">
+                  <i class="bi bi-shield-lock-fill"></i>
+                </div>
+              </div>
 
-                <div class="row g-3">
-                  <div class="col-12 col-md-4">
-                    <label class="form-label-lite">Tanggal Data</label>
-                    <input type="date" id="u-t" class="form-control input-elegant">
+              <div class="admin-subnav card-mewah">
+                <button type="button" class="admin-subtab active" id="admin-tab-karyawan" onclick="switchAdminSection('karyawan')">
+                  <i class="bi bi-people-fill"></i>
+                  <span>Data Karyawan</span>
+                </button>
+                <button type="button" class="admin-subtab" id="admin-tab-users" onclick="switchAdminSection('users')">
+                  <i class="bi bi-person-gear"></i>
+                  <span>User Management</span>
+                </button>
+                <button type="button" class="admin-subtab" id="admin-tab-upload" onclick="switchAdminSection('upload')">
+                  <i class="bi bi-cloud-arrow-up-fill"></i>
+                  <span>Upload Data Excel</span>
+                </button>
+              </div>
+
+              <div id="admin-section-karyawan" class="admin-section active">
+                <div class="card-mewah">
+                  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                      <h6 class="section-title-main mb-1">Data Karyawan</h6>
+                      <p class="section-desc mb-0">Daftar master karyawan dari DB_Karyawan / Master_Karyawan.</p>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadAdminKaryawan()">
+                      <i class="bi bi-arrow-repeat me-1"></i>Refresh
+                    </button>
                   </div>
-
-                  <div class="col-12 col-md-4">
-                    <label class="form-label-lite">Jenis Upload</label>
-                    <select id="u-j" class="form-select input-elegant">
-                      <option value="1">Achv CS</option>
-                      <option value="2">Achv SPV</option>
-                      <option value="4">Cair CS</option>
-                      <option value="5">Cair SPV</option>
-                      <option value="7">Pipeline</option>
-                    </select>
+                  <div class="row g-2 mt-1">
+                    <div class="col-12 col-lg-8">
+                      <input type="text" id="admin-karyawan-search" class="form-control input-elegant" placeholder="Cari NIK, Nama, Cabang, Jabatan..." oninput="renderAdminKaryawanTable()">
+                    </div>
+                    <div class="col-6 col-lg-2">
+                      <div class="admin-mini-stat">
+                        <small>Total Data</small>
+                        <b id="admin-karyawan-total">0</b>
+                      </div>
+                    </div>
+                    <div class="col-6 col-lg-2">
+                      <div class="admin-mini-stat">
+                        <small>Cabang</small>
+                        <b id="admin-karyawan-cabang">0</b>
+                      </div>
+                    </div>
                   </div>
-
-                  <div class="col-12 col-md-4">
-                    <label class="form-label-lite">File Excel</label>
-                    <input type="file" id="u-f" class="form-control input-elegant" accept=".xlsx,.xls,.csv">
+                  <div class="table-responsive mt-3 admin-karyawan-table-wrap">
+                    <table class="table table-hover align-middle mb-0 admin-karyawan-table">
+                      <thead>
+                        <tr>
+                          <th style="min-width:130px;">NIK/NPK</th>
+                          <th style="min-width:200px;">Nama Karyawan</th>
+                          <th style="min-width:160px;">Cabang</th>
+                          <th style="min-width:150px;">Jabatan</th>
+                          <th style="min-width:120px;">Region</th>
+                        </tr>
+                      </thead>
+                      <tbody id="admin-karyawan-body">
+                        <tr><td colspan="5" class="empty-state">Memuat data karyawan...</td></tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
+              </div>
 
-                <button class="btn btn-admin-main w-100 fw-bold py-3 shadow-sm mt-4" onclick="execU()">
-                  <i class="bi bi-upload me-2"></i>UNGGAH DATA
-                </button>
+              <div id="admin-section-users" class="admin-section">
+                <div class="card-mewah">
+                  <h6 class="section-title-main">User Management</h6>
+                  <p class="section-desc mb-0">Modul ini disiapkan berikutnya. Struktur menu sudah tersedia.</p>
+                </div>
+              </div>
+
+              <div id="admin-section-upload" class="admin-section">
+                <div class="card-mewah card-admin shadow-sm">
+                  <div class="section-chip admin-chip">Admin Center</div>
+                  <h6 class="section-title-main">Upload Data Excel</h6>
+                  <p class="section-desc">Unggah data harian achievement, pencairan, atau pipeline dengan format Excel/CSV.</p>
+
+                  <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label-lite">Tanggal Data</label>
+                      <input type="date" id="u-t" class="form-control input-elegant">
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                      <label class="form-label-lite">Jenis Upload</label>
+                      <select id="u-j" class="form-select input-elegant">
+                        <option value="1">Achv CS</option>
+                        <option value="2">Achv SPV</option>
+                        <option value="4">Cair CS</option>
+                        <option value="5">Cair SPV</option>
+                        <option value="7">Pipeline</option>
+                      </select>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                      <label class="form-label-lite">File Excel</label>
+                      <input type="file" id="u-f" class="form-control input-elegant" accept=".xlsx,.xls,.csv">
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn-admin-main w-100 fw-bold py-3 shadow-sm mt-4" onclick="execU()">
+                    <i class="bi bi-upload me-2"></i>UNGGAH DATA
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -133,23 +215,23 @@
   </div>
 
   <nav class="nav-fix">
-    <button onclick="switchPage('home')" class="nav-item active" id="n-home">
+    <button type="button" onclick="switchPage('home')" class="nav-item active" id="n-home">
       <span class="nav-icon nav-home"><i class="bi bi-speedometer2"></i></span>
       <span class="nav-text">Home</span>
     </button>
-    <button onclick="switchPage('pipe')" class="nav-item" id="n-pipe">
+    <button type="button" onclick="switchPage('pipe')" class="nav-item" id="n-pipe">
       <span class="nav-icon nav-pipe"><i class="bi bi-funnel-fill"></i></span>
       <span class="nav-text">Pipeline</span>
     </button>
-    <button onclick="switchPage('report')" class="nav-item" id="n-report">
+    <button type="button" onclick="switchPage('report')" class="nav-item" id="n-report">
       <span class="nav-icon nav-report"><i class="bi bi-file-earmark-text-fill"></i></span>
       <span class="nav-text">Report</span>
     </button>
-    <button onclick="switchPage('coaching')" class="nav-item" id="n-coaching">
+    <button type="button" onclick="switchPage('coaching')" class="nav-item" id="n-coaching">
       <span class="nav-icon nav-coaching"><i class="bi bi-person-badge-fill"></i></span>
       <span class="nav-text">Coaching</span>
     </button>
-    <button onclick="switchPage('admin')" class="nav-item" id="n-admin">
+    <button type="button" onclick="switchPage('admin')" class="nav-item" id="n-admin">
       <span class="nav-icon nav-admin"><i class="bi bi-shield-lock-fill"></i></span>
       <span class="nav-text">Admin</span>
     </button>

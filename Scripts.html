@@ -1,6 +1,10 @@
 <script>
   let db = { u: {}, achv: [], cair: [], pipeline: [], listCHome: [], listCPipe: [], listS: [] };
   let dbCoaching = { master: [], coaching: [], progress: [] };
+  let dbAdminEmployee = { headers: [], rows: [], total: 0 };
+  let adminEmployeeViewRows = [];
+  const adminEmployeeFilter = { keyword: '', branch: '' };
+  let currentAdminSection = 'karyawan';
   let chartMix = null;
   let pipeFiltered = [];
   let rowLimit = 25;
@@ -550,6 +554,9 @@
     currentPage = pageIndexMap[page] === undefined ? 'home' : page;
     updatePageTransform(forceMove);
     updateActiveNavigation(currentPage);
+    if (currentPage === 'admin') {
+      switchAdminSection(currentAdminSection || 'karyawan');
+    }
   }
 
   function updatePageTransform() {
@@ -575,6 +582,7 @@
     const navMap = {
       home: 'n-home',
       pipe: 'n-pipe',
+      report: 'n-report',
       coaching: 'n-coaching',
       admin: 'n-admin'
     };
@@ -592,6 +600,7 @@
     const quickMap = {
       home: '.quick-home',
       pipe: '.quick-pipe',
+      report: '.quick-report',
       coaching: '.quick-coaching',
       admin: '.quick-admin'
     };
@@ -676,6 +685,111 @@
     };
 
     reader.readAsArrayBuffer(file);
+  }
+
+  function switchAdminSection(section) {
+    currentAdminSection = section || 'karyawan';
+    const sections = ['karyawan', 'users', 'upload'];
+    sections.forEach(key => {
+      const secEl = document.getElementById(`admin-section-${key}`);
+      const tabEl = document.getElementById(`admin-tab-${key}`);
+      const active = key === currentAdminSection;
+      if (secEl) secEl.classList.toggle('active', active);
+      if (tabEl) tabEl.classList.toggle('active', active);
+    });
+    if (currentAdminSection === 'karyawan' && (!dbAdminEmployee.rows || !dbAdminEmployee.rows.length)) {
+      loadAdminKaryawan();
+    }
+  }
+
+  function loadAdminKaryawan() {
+    const body = document.getElementById('admin-karyawan-body');
+    if (body) body.innerHTML = "<tr><td colspan='5' class='empty-state'>Memuat data karyawan...</td></tr>";
+    google.script.run
+      .withSuccessHandler(res => {
+        const payload = res || {};
+        const headers = Array.isArray(payload.headers) ? payload.headers : [];
+        const rows = Array.isArray(payload.rows) ? payload.rows : [];
+        dbAdminEmployee = { headers, rows, summary: payload.summary || {} };
+        renderAdminKaryawanTable();
+      })
+      .withFailureHandler(err => {
+        if (body) body.innerHTML = "<tr><td colspan='5' class='empty-state'>Gagal memuat data karyawan.</td></tr>";
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal memuat data karyawan', 'error');
+      })
+      .getAdminEmployeeData();
+  }
+
+  function renderAdminKaryawanTable() {
+    const body = document.getElementById('admin-karyawan-body');
+    if (!body) return;
+    const keywordEl = document.getElementById('admin-karyawan-search');
+    const keyword = String((keywordEl && keywordEl.value) || '').trim().toLowerCase();
+    adminEmployeeFilter.keyword = keyword;
+
+    const idx = getAdminEmployeeIndexMap();
+    const rows = dbAdminEmployee.rows || [];
+    const filtered = rows.filter(r => {
+      if (!keyword) return true;
+      const cells = [
+        r[idx.nik] || '',
+        r[idx.nama] || '',
+        r[idx.cabang] || '',
+        r[idx.jabatan] || '',
+        r[idx.region] || ''
+      ].map(v => String(v || '').toLowerCase());
+      return cells.some(v => v.includes(keyword));
+    });
+    adminEmployeeViewRows = filtered;
+
+    updateAdminSummaryCounts(filtered);
+
+    if (!filtered.length) {
+      body.innerHTML = "<tr><td colspan='5' class='empty-state'>Data tidak ditemukan.</td></tr>";
+      return;
+    }
+
+    body.innerHTML = filtered.slice(0, 1000).map(r => `
+      <tr>
+        <td>${escapeHtml(r[idx.nik] || '-')}</td>
+        <td class="fw-semibold">${escapeHtml(r[idx.nama] || '-')}</td>
+        <td>${escapeHtml(r[idx.cabang] || '-')}</td>
+        <td>${escapeHtml(r[idx.jabatan] || '-')}</td>
+        <td>${escapeHtml(r[idx.region] || '-')}</td>
+      </tr>
+    `).join('');
+  }
+
+  function getAdminEmployeeIndexMap() {
+    const headers = (dbAdminEmployee.headers || []).map(h => String(h || '').toLowerCase());
+    const findIdx = (keys, fallback) => {
+      for (let i = 0; i < headers.length; i++) {
+        if (keys.some(k => headers[i].includes(k))) return i;
+      }
+      return fallback;
+    };
+    return {
+      nik: findIdx(['nik', 'npk', 'id pegawai', 'employee id'], 0),
+      nama: findIdx(['nama', 'name'], 1),
+      cabang: findIdx(['cabang', 'branch'], 2),
+      jabatan: findIdx(['jabatan', 'posisi', 'position'], 3),
+      region: findIdx(['region', 'wilayah', 'area'], 4)
+    };
+  }
+
+  function updateAdminSummaryCounts(rows) {
+    const totalEl = document.getElementById('admin-karyawan-total');
+    const cabangEl = document.getElementById('admin-karyawan-cabang');
+    if (totalEl) totalEl.textContent = String((rows || []).length);
+    if (cabangEl) {
+      const idx = getAdminEmployeeIndexMap();
+      const uniq = {};
+      (rows || []).forEach(r => {
+        const cab = String((r && r[idx.cabang]) || '').trim().toUpperCase();
+        if (cab) uniq[cab] = true;
+      });
+      cabangEl.textContent = String(Object.keys(uniq).length);
+    }
   }
 
   function fetchCoachingAddon() {

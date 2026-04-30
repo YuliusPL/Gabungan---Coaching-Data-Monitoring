@@ -1103,6 +1103,169 @@
     box-shadow: 0 12px 24px rgba(222, 122, 22, 0.18);
   }
 
+  .admin-section { display: none; }
+  .admin-section.active { display: block; }
+
+  .admin-subnav {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .admin-subtab {
+    border: 1px solid rgba(15, 61, 117, 0.14);
+    background: rgba(255,255,255,0.88);
+    color: #1a4f8f;
+    border-radius: 14px;
+    padding: 11px 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .admin-subtab.active {
+    border-color: transparent;
+    color: #fff;
+    background: linear-gradient(135deg, #f39a2d, #de7a16);
+    box-shadow: 0 10px 20px rgba(222, 122, 22, 0.18);
+  }
+
+  .admin-mini-stat {
+    border: 1px solid rgba(15, 61, 117, 0.1);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.9);
+    padding: 8px 10px;
+  }
+
+  .admin-mini-stat small {
+    display: block;
+    color: #617590;
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .admin-mini-stat b {
+    font-size: 18px;
+    color: #143e73;
+  }
+
+  .admin-karyawan-table-wrap {
+    border: 1px solid rgba(15, 61, 117, 0.12);
+    border-radius: 14px;
+    max-height: 62vh;
+    overflow: auto;
+  }
+
+  .admin-karyawan-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f6f9ff;
+    border-bottom: 1px solid rgba(15, 61, 117, 0.12);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .admin-tabbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .admin-tab-btn {
+    border: 1px solid rgba(15, 61, 117, 0.18);
+    background: rgba(255, 255, 255, 0.86);
+    color: #18457f;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .admin-tab-btn.active {
+    border-color: transparent;
+    color: #fff;
+    background: linear-gradient(135deg, #f39a2d, #de7a16);
+    box-shadow: 0 10px 20px rgba(222, 122, 22, 0.18);
+  }
+
+  .employee-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .employee-kpi-card {
+    border: 1px solid rgba(15, 61, 117, 0.12);
+    background: rgba(255,255,255,0.9);
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+
+  .employee-kpi-label {
+    font-size: 11px;
+    color: #5f6f84;
+    margin-bottom: 4px;
+  }
+
+  .employee-kpi-value {
+    font-size: 23px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #123a6c;
+  }
+
+  .employee-tools {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin: 12px 0 10px;
+  }
+
+  .employee-table-wrap {
+    border: 1px solid rgba(15, 61, 117, 0.12);
+    border-radius: 14px;
+    overflow: auto;
+    max-height: 62vh;
+    background: #fff;
+  }
+
+  .employee-table {
+    min-width: 860px;
+    margin: 0;
+  }
+
+  .employee-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f6f9ff;
+    border-bottom: 1px solid rgba(15, 61, 117, 0.12);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .employee-meta {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #67788f;
+  }
+
+  @media (min-width: 768px) {
+    .admin-subnav {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
   .kpi-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
