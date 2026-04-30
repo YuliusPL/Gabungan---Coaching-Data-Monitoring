@@ -400,6 +400,33 @@ function deleteAdminEmployeeByNik(nik) {
   return { ok: false, message: 'NIK tidak ditemukan.' };
 }
 
+function isValidAdminDeletePin(pin) {
+  var key = String(pin || '').trim();
+  if (!key) return false;
+  var nikList = Object.keys(EMBEDDED_ADMIN_USERS || {});
+  for (var i = 0; i < nikList.length; i++) {
+    var rec = EMBEDDED_ADMIN_USERS[nikList[i]];
+    if (!rec) continue;
+    if (String(rec.statusUser || '').toUpperCase() !== 'AKTIF') continue;
+    if (String(rec.password || '') === key) return true;
+  }
+  return false;
+}
+
+function deleteAdminEmployeeByNikSecure(nik, adminPin) {
+  if (!isValidAdminDeletePin(adminPin)) {
+    return { ok: false, message: 'PIN Admin tidak valid. Hapus permanen dibatalkan.' };
+  }
+  return deleteAdminEmployeeByNik(nik);
+}
+
+function verifyAdminDeletePin(adminPin) {
+  if (!isValidAdminDeletePin(adminPin)) {
+    return { ok: false, message: 'PIN Admin tidak valid.' };
+  }
+  return { ok: true, message: 'PIN Admin valid.' };
+}
+
 function deleteAdminEmployeeByNikMode(nik, mode) {
   var modeVal = String(mode || 'hard').toLowerCase();
   if (modeVal === 'soft') return deactivateAdminEmployeeByNik(nik);

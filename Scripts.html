@@ -885,21 +885,56 @@
     }).then(result => {
       if (!result.isConfirmed && !result.isDenied) return;
       const mode = result.isConfirmed ? 'soft' : 'hard';
-      google.script.run
-        .withSuccessHandler(res => {
-          const out = res || {};
-          if (!out.ok) {
-            Swal.fire('Gagal', out.message || 'Hapus data gagal', 'error');
-            return;
-          }
-          Swal.fire('Sukses', out.message || 'Data karyawan berhasil dihapus', 'success');
-          loadAdminKaryawan();
-          openAdminEmployeeCreate();
-        })
-        .withFailureHandler(err => {
-          Swal.fire('Error', err && err.message ? err.message : 'Gagal menghapus data karyawan', 'error');
-        })
-        [mode === 'soft' ? 'deactivateAdminEmployeeByNik' : 'deleteAdminEmployeeByNik'](nik);
+      if (mode === 'soft') {
+        google.script.run
+          .withSuccessHandler(res => {
+            const out = res || {};
+            if (!out.ok) {
+              Swal.fire('Gagal', out.message || 'Soft delete gagal', 'error');
+              return;
+            }
+            Swal.fire('Sukses', out.message || 'Karyawan dinonaktifkan', 'success');
+            loadAdminKaryawan();
+            openAdminEmployeeCreate();
+          })
+          .withFailureHandler(err => {
+            Swal.fire('Error', err && err.message ? err.message : 'Gagal melakukan soft delete', 'error');
+          })
+          .deactivateAdminEmployeeByNik(nik);
+        return;
+      }
+
+      Swal.fire({
+        title: 'PIN Admin dibutuhkan',
+        input: 'password',
+        inputLabel: 'Masukkan PIN Admin untuk Hapus Permanen',
+        inputPlaceholder: 'PIN Admin',
+        showCancelButton: true,
+        confirmButtonText: 'Verifikasi & Hapus',
+        cancelButtonText: 'Batal',
+        inputValidator: (value) => {
+          if (!value) return 'PIN wajib diisi.';
+          return undefined;
+        }
+      }).then(pinResult => {
+        if (!pinResult.isConfirmed) return;
+        const pin = String(pinResult.value || '');
+        google.script.run
+          .withSuccessHandler(res => {
+            const out = res || {};
+            if (!out.ok) {
+              Swal.fire('Akses Ditolak', out.message || 'PIN Admin tidak valid.', 'error');
+              return;
+            }
+            Swal.fire('Sukses', out.message || 'Data karyawan dihapus permanen', 'success');
+            loadAdminKaryawan();
+            openAdminEmployeeCreate();
+          })
+          .withFailureHandler(err => {
+            Swal.fire('Error', err && err.message ? err.message : 'Gagal menghapus permanen', 'error');
+          })
+          .deleteAdminEmployeeByNikSecure(nik, pin);
+      });
     });
   }
 
