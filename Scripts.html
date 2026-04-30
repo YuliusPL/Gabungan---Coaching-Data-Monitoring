@@ -4,6 +4,7 @@
   let dbAdminEmployee = { headers: [], rows: [], total: 0 };
   let adminUserDirectory = { records: [], byNik: {}, byName: {}, branches: [] };
   let adminEmployeeLookup = { byNik: {}, byName: {}, branches: [] };
+  let authReference = { employees: [], branches: [] };
   let adminEmployeeViewRows = [];
   let adminKaryawanEditMode = 'add';
   let adminKaryawanOriginalNik = '';
@@ -28,9 +29,48 @@
   const pageOrder = ['home', 'pipe', 'coaching', 'report', 'admin'];
   const pageIndexMap = { home: 0, pipe: 1, coaching: 2, report: 3, admin: 4 };
   const storageKey = 'cc_modular_no_tele_v1';
+  const authStorageKey = 'cc_internal_auth_v1';
+
+  window.onerror = function(message, source, lineno, colno, error) {
+    hideLoader();
+    try {
+      console.error('GlobalError:', message, source, lineno, colno, error);
+    } catch (e) {}
+    return false;
+  };
+
+  window.onunhandledrejection = function(event) {
+    hideLoader();
+    try {
+      console.error('UnhandledRejection:', event && event.reason ? event.reason : event);
+    } catch (e) {}
+  };
+
+  function safeInitApp() {
+    initApp();
+  }
+
+  function submitLogin() {
+    loginInternal();
+  }
+
+  function submitRegisterFromLogin() {
+    registerInternalFromLogin();
+  }
+
+  function logoutSession() {
+    logoutInternal();
+  }
 
   function initApp() {
     try {
+      const session = getAuthSession();
+      if (!session || !session.nik) {
+        showLoginScreen();
+        hideLoader();
+        return;
+      }
+
       setDefaultDates();
       setupSwipeNavigation();
 
@@ -53,6 +93,179 @@
       hideLoader();
       Swal.fire('Error', e && e.message ? e.message : 'Terjadi kesalahan saat inisialisasi aplikasi', 'error');
     }
+  }
+
+  function getAuthSession() {
+    try {
+      const raw = sessionStorage.getItem(authStorageKey);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setAuthSession(userObj) {
+    const payload = {
+      nik: String((userObj && userObj.nik) || '').trim(),
+      nama: String((userObj && userObj.nama) || '').trim(),
+      role: String((userObj && userObj.role) || '').trim(),
+      cabang: String((userObj && userObj.cabang) || '').trim(),
+      loginAt: new Date().toISOString()
+    };
+    sessionStorage.setItem(authStorageKey, JSON.stringify(payload));
+  }
+
+  function clearAuthSession() {
+    sessionStorage.removeItem(authStorageKey);
+  }
+
+  function showLoginScreen() {
+    const login = document.getElementById('login-screen');
+    const app = document.getElementById('app-shell');
+    const nav = document.querySelector('.nav-fix');
+    if (login) login.style.display = 'block';
+    if (app) app.style.display = 'none';
+    if (nav) nav.style.display = 'none';
+    switchAuthMode('login');
+    loadAuthReferenceData();
+  }
+
+  function showAppShell() {
+    const login = document.getElementById('login-screen');
+    const app = document.getElementById('app-shell');
+    const nav = document.querySelector('.nav-fix');
+    if (login) login.style.display = 'none';
+    if (app) app.style.display = 'block';
+    if (nav) nav.style.display = 'flex';
+  }
+
+  function switchAuthMode(mode) {
+    const loginPane = document.getElementById('auth-login-pane');
+    const regPane = document.getElementById('auth-register-pane');
+    const btnLogin = document.getElementById('auth-tab-login');
+    const btnReg = document.getElementById('auth-tab-register');
+    const isLogin = mode !== 'register';
+    if (loginPane) loginPane.style.display = isLogin ? 'block' : 'none';
+    if (regPane) regPane.style.display = isLogin ? 'none' : 'block';
+    if (btnLogin) btnLogin.classList.toggle('active', isLogin);
+    if (btnReg) btnReg.classList.toggle('active', !isLogin);
+  }
+
+  function loadAuthReferenceData() {
+    google.script.run
+      .withSuccessHandler(res => {
+        const payload = res || {};
+        authReference = {
+          employees: Array.isArray(payload.employees) ? payload.employees : [],
+          branches: Array.isArray(payload.branches) ? payload.branches : []
+        };
+        renderAuthReferenceSources();
+      })
+      .withFailureHandler(err => {
+        console.error(err);
+      })
+      .getUserRegistrationReferenceData();
+  }
+
+  function renderAuthReferenceSources() {
+    const nikList = document.getElementById('auth-reg-nik-list');
+    const namaList = document.getElementById('auth-reg-nama-list');
+    const cabSel = document.getElementById('auth-reg-cabang');
+    if (nikList) {
+      nikList.innerHTML = authReference.employees.map(r => `<option value="${escapeHtml(r.nik || '')}"></option>`).join('');
+    }
+    if (namaList) {
+      namaList.innerHTML = authReference.employees.map(r => `<option value="${escapeHtml(r.nama || '')}"></option>`).join('');
+    }
+    if (cabSel) {
+      cabSel.innerHTML = '<option value="">Pilih Cabang</option>';
+      authReference.branches.forEach(cab => cabSel.add(new Option(cab, cab)));
+    }
+  }
+
+  function onAuthRegNikChange() {
+    const nik = getValue('auth-reg-nik');
+    const rec = (authReference.employees || []).find(r => String(r.nik || '').trim() === String(nik || '').trim());
+    if (!rec) return;
+    setValue('auth-reg-nama', rec.nama || '');
+    setValue('auth-reg-jabatan', rec.jabatan || '');
+    setValue('auth-reg-cabang', rec.cabang || '');
+  }
+
+  function onAuthRegNamaChange() {
+    const nama = String(getValue('auth-reg-nama') || '').trim().toUpperCase();
+    const rec = (authReference.employees || []).find(r => String(r.nama || '').trim().toUpperCase() === nama);
+    if (!rec) return;
+    setValue('auth-reg-nik', rec.nik || '');
+    setValue('auth-reg-jabatan', rec.jabatan || '');
+    setValue('auth-reg-cabang', rec.cabang || '');
+  }
+
+  function loginInternal() {
+    const nik = getValue('auth-login-nik');
+    const password = getValue('auth-login-password');
+    if (!nik || !password) {
+      Swal.fire('Validasi', 'NIK dan Password wajib diisi.', 'warning');
+      return;
+    }
+    Swal.fire({ title: 'Memproses login...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    google.script.run
+      .withSuccessHandler(res => {
+        Swal.close();
+        const out = res || {};
+        if (!out.ok) {
+          Swal.fire('Login gagal', out.message || 'NIK/password tidak valid', 'error');
+          return;
+        }
+        setAuthSession(out.user || {});
+        showAppShell();
+        sessionStorage.removeItem(storageKey);
+        initApp();
+      })
+      .withFailureHandler(err => {
+        Swal.close();
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal login', 'error');
+      })
+      .loginInternalUser({ nik, password });
+  }
+
+  function registerInternalFromLogin() {
+    const payload = {
+      nik: getValue('auth-reg-nik'),
+      nama: getValue('auth-reg-nama'),
+      jabatan: getValue('auth-reg-jabatan'),
+      cabang: getValue('auth-reg-cabang'),
+      password: getValue('auth-reg-password'),
+      rePassword: getValue('auth-reg-repassword')
+    };
+    if (!payload.nik || !payload.nama || !payload.jabatan || !payload.cabang || !payload.password || !payload.rePassword) {
+      Swal.fire('Validasi', 'Semua field wajib diisi.', 'warning');
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(res => {
+        const out = res || {};
+        if (!out.ok) {
+          Swal.fire('Gagal', out.message || 'Pendaftaran gagal', 'error');
+          return;
+        }
+        Swal.fire('Sukses', out.message || 'Pendaftaran berhasil', 'success');
+        switchAuthMode('login');
+        setValue('auth-login-nik', payload.nik);
+        setValue('auth-login-password', '');
+      })
+      .withFailureHandler(err => {
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal mendaftar', 'error');
+      })
+      .registerUserId(payload);
+  }
+
+  function logoutInternal() {
+    clearAuthSession();
+    sessionStorage.removeItem(storageKey);
+    showLoginScreen();
+    setValue('auth-login-password', '');
   }
 
   function setDefaultDates() {

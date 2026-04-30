@@ -14,7 +14,66 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <?!= include('Styles'); ?>
 </head>
-<body onload="initApp()">
+<body onload="safeInitApp()">
+  <div id="login-shell" class="login-shell">
+    <div class="login-card card-mewah">
+      <div class="section-chip admin-chip">Secure Access</div>
+      <h5 class="mb-1 fw-bold">Masuk Aplikasi</h5>
+      <p class="section-desc mb-3">Gunakan NIK dan password internal.</p>
+      <div class="row g-2">
+        <div class="col-12">
+          <label class="form-label-lite">NIK / User ID</label>
+          <input type="text" id="login-nik" class="form-control input-elegant" placeholder="Masukkan NIK">
+        </div>
+        <div class="col-12">
+          <label class="form-label-lite">Password</label>
+          <input type="password" id="login-password" class="form-control input-elegant" placeholder="Masukkan password">
+        </div>
+      </div>
+      <button type="button" class="btn btn-admin-main w-100 fw-bold py-2 mt-3" onclick="submitLogin()">
+        <i class="bi bi-box-arrow-in-right me-1"></i>Masuk
+      </button>
+      <button type="button" class="btn btn-link w-100 mt-2" onclick="switchAuthMode('register')">Belum punya akun? Daftar</button>
+    </div>
+
+    <div class="login-card card-mewah d-none" id="register-shell">
+      <h5 class="mb-1 fw-bold">Daftar User ID</h5>
+      <p class="section-desc mb-3">NIK/Nama sinkron otomatis dari data karyawan.</p>
+      <div class="row g-2">
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">NIK</label>
+          <input type="text" id="auth-reg-nik" class="form-control input-elegant" list="auth-reg-nik-list" oninput="onAuthRegisterNikChange()">
+          <datalist id="auth-reg-nik-list"></datalist>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">Nama</label>
+          <input type="text" id="auth-reg-nama" class="form-control input-elegant" list="auth-reg-nama-list" oninput="onAuthRegisterNamaChange()">
+          <datalist id="auth-reg-nama-list"></datalist>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">Jabatan (otomatis)</label>
+          <input type="text" id="auth-reg-jabatan" class="form-control input-elegant" readonly>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">Cabang</label>
+          <select id="auth-reg-cabang" class="form-select input-elegant"></select>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">Password</label>
+          <input type="password" id="auth-reg-password" class="form-control input-elegant">
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">Re Password</label>
+          <input type="password" id="auth-reg-repassword" class="form-control input-elegant">
+        </div>
+      </div>
+      <button type="button" class="btn btn-admin-main w-100 fw-bold py-2 mt-3" onclick="submitRegisterFromLogin()">
+        <i class="bi bi-person-plus-fill me-1"></i>Daftar
+      </button>
+      <button type="button" class="btn btn-link w-100 mt-2" onclick="switchAuthMode('login')">Sudah punya akun? Masuk</button>
+    </div>
+  </div>
+
   <div id="loader-global">
     <div class="loader-card">
       <div class="spinner-grow text-primary"></div>
@@ -23,7 +82,7 @@
     </div>
   </div>
 
-  <div id="app-shell">
+  <div id="app-shell" style="display:none;">
     <header class="top-shell">
       <div class="header-box">
         <div class="header-row">

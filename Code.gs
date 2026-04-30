@@ -23,6 +23,57 @@ function getEmbeddedAdminByNik(nik) {
   return rec;
 }
 
+function authenticateUserId(nik, password) {
+  var userNik = String(nik || '').trim();
+  var pass = String(password || '');
+  if (!userNik || !pass) return { ok: false, message: 'User ID dan Password wajib diisi.' };
+
+  var embedded = getEmbeddedAdminByNik(userNik);
+  if (embedded && String(embedded.password || '') === pass) {
+    return {
+      ok: true,
+      message: 'Login berhasil.',
+      user: {
+        nik: embedded.nik,
+        nama: embedded.nama,
+        cabang: embedded.cabang || 'ALL',
+        role: 'Admin',
+        roleApp: embedded.roleApp || 'ADMIN',
+        statusUser: embedded.statusUser || 'AKTIF'
+      }
+    };
+  }
+
+  var ss = getDB();
+  var sh = ss.getSheetByName('User_ID');
+  if (!sh || sh.getLastRow() < 2) return { ok: false, message: 'User tidak ditemukan.' };
+  var rows = sh.getDataRange().getValues();
+  for (var r = 1; r < rows.length; r++) {
+    var rowNik = String((rows[r] && rows[r][0]) || '').trim();
+    var rowPass = String((rows[r] && rows[r][3]) || '');
+    var rowStatus = String((rows[r] && rows[r][5]) || 'AKTIF').trim().toUpperCase();
+    if (!rowNik || rowNik !== userNik) continue;
+    if (rowStatus && rowStatus !== 'AKTIF' && rowStatus !== 'ACTIVE') {
+      return { ok: false, message: 'Status user tidak aktif.' };
+    }
+    if (rowPass !== pass) return { ok: false, message: 'Password salah.' };
+    var roleApp = String((rows[r] && rows[r][4]) || '').trim().toUpperCase() || 'STAFF';
+    return {
+      ok: true,
+      message: 'Login berhasil.',
+      user: {
+        nik: rowNik,
+        nama: String((rows[r] && rows[r][1]) || '').trim() || rowNik,
+        cabang: String((rows[r] && rows[r][2]) || '').trim() || 'ALL',
+        role: roleApp === 'ADMIN' ? 'Admin' : roleApp,
+        roleApp: roleApp,
+        statusUser: rowStatus || 'AKTIF'
+      }
+    };
+  }
+  return { ok: false, message: 'User tidak ditemukan.' };
+}
+
 function getDB() {
   return SpreadsheetApp.openById(DB_ID);
 }
@@ -623,6 +674,178 @@ function deriveRoleFromJabatan(jabatan) {
   if (j.indexOf('BRANCH MANAGER') !== -1) return 'BM';
   if (j.indexOf('SUPERVISOR') !== -1) return 'SUPERVISOR';
   return 'STAFF';
+}
+
+function resolveAuthRole(rec) {
+  if (rec && rec.roleApp) {
+    var roleApp = String(rec.roleApp || '').toUpperCase();
+    if (roleApp === 'ADMIN') return 'Admin';
+    if (roleApp === 'HEAD') return 'Head';
+    if (roleApp === 'BM') return 'BM';
+    if (roleApp === 'SUPERVISOR') return 'Supervisor';
+    return 'Staff';
+  }
+  return 'Staff';
+}
+
+function buildBranchListsFromDashboardRaw(raw) {
+  var listHome = {};
+  var listPipe = {};
+  var listSales = {};
+
+  (raw.achv || []).forEach(function(r) {
+    var cab = String((r && r[1]) || '').trim();
+    if (cab) listHome[cab] = true;
+  });
+  (raw.pipeline || []).forEach(function(r) {
+    var cab = String((r && r[8]) || '').trim();
+    var sales = String((r && r[6]) || '').trim();
+    if (cab) listPipe[cab] = true;
+    if (sales && sales !== '-') listSales[sales] = true;
+  });
+
+  return {
+    listCHome: Object.keys(listHome).sort(),
+    listCPipe: Object.keys(listPipe).sort(),
+    listS: Object.keys(listSales).sort()
+  };
+}
+
+function filterDashboardByUserScope(raw, authUser) {
+  var role = String((authUser && authUser.role) || '').toUpperCase();
+  var nik = String((authUser && authUser.nik) || '').trim();
+  var cabang = String((authUser && authUser.cabang) || '').trim().toUpperCase();
+
+  if (role === 'ADMIN' || !nik) return raw;
+
+  var directory = getEmployeeDirectoryData();
+  var records = directory.records || [];
+  var byNik = directory.byNik || {};
+  var nikSet = {};
+  nikSet[nik] = true;
+
+  if (role === 'SUPERVISOR' || role === 'HEAD') {
+    records.forEach(function(rec) {
+      var recNik = String(rec.nik || '').trim();
+      var atasanNik = String(rec.nikAtasanLangsung || '').trim();
+      var atasan2Nik = String(rec.nikAtasan2 || '').trim();
+      if (!recNik) return;
+      if (atasanNik === nik || atasan2Nik === nik) nikSet[recNik] = true;
+    });
+  } else if (role === 'BM') {
+    records.forEach(function(rec) {
+      var recNik = String(rec.nik || '').trim();
+      var recCab = String(rec.cabang || '').trim().toUpperCase();
+      if (recNik && recCab && cabang && recCab === cabang) nikSet[recNik] = true;
+    });
+  }
+
+  var nameSet = {};
+  Object.keys(nikSet).forEach(function(n) {
+    var rec = byNik[n];
+    if (!rec) return;
+    var nama = String(rec.nama || '').trim();
+    if (nama) nameSet[nama.toUpperCase()] = true;
+  });
+
+  var filtered = {
+    achv: (raw.achv || []).filter(function(r) {
+      var nama = String((r && r[2]) || '').trim().toUpperCase();
+      return !!nameSet[nama];
+    }),
+    cair: (raw.cair || []).filter(function(r) {
+      var nama = String((r && r[2]) || '').trim().toUpperCase();
+      return !!nameSet[nama];
+    }),
+    pipeline: (raw.pipeline || []).filter(function(r) {
+      var sales = String((r && r[6]) || '').trim().toUpperCase();
+      return !!nameSet[sales];
+    })
+  };
+
+  var lists = buildBranchListsFromDashboardRaw(filtered);
+  return {
+    u: authUser,
+    achv: filtered.achv,
+    cair: filtered.cair,
+    pipeline: filtered.pipeline,
+    listCHome: lists.listCHome,
+    listCPipe: lists.listCPipe,
+    listS: lists.listS
+  };
+}
+
+function hashPasswordSHA256(str) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(str || ''), Utilities.Charset.UTF_8);
+  return bytes.map(function(b) {
+    var v = (b < 0 ? b + 256 : b).toString(16);
+    return v.length === 1 ? '0' + v : v;
+  }).join('');
+}
+
+function verifyPasswordInput(inputPassword, storedPassword) {
+  var input = String(inputPassword || '');
+  var stored = String(storedPassword || '');
+  if (!stored) return false;
+  if (stored === input) return true; // backward compatibility plain
+  var hashedInput = hashPasswordSHA256(input);
+  return stored.toLowerCase() === hashedInput.toLowerCase();
+}
+
+function getAuthUserByNik(nik, password) {
+  var key = String(nik || '').trim();
+  var pass = String(password || '');
+  if (!key || !pass) return { ok: false, message: 'NIK dan Password wajib diisi.' };
+
+  var embedded = getEmbeddedAdminByNik(key);
+  if (embedded && verifyPasswordInput(pass, embedded.password)) {
+    return {
+      ok: true,
+      user: {
+        nik: embedded.nik,
+        nama: embedded.nama,
+        role: 'Admin',
+        cabang: embedded.cabang || 'ALL'
+      }
+    };
+  }
+
+  var ss = getDB();
+  var sh = ss.getSheetByName('User_ID');
+  if (!sh || sh.getLastRow() < 2) return { ok: false, message: 'User belum terdaftar.' };
+  var rows = sh.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    var nikVal = String((rows[i] && rows[i][0]) || '').trim();
+    if (nikVal !== key) continue;
+    var status = String((rows[i] && rows[i][5]) || '').trim().toUpperCase();
+    if (status && status !== 'AKTIF') return { ok: false, message: 'User tidak aktif.' };
+    var storedPassword = String((rows[i] && rows[i][3]) || '');
+    if (!verifyPasswordInput(pass, storedPassword)) return { ok: false, message: 'Password salah.' };
+    var roleApp = String((rows[i] && rows[i][4]) || '');
+    return {
+      ok: true,
+      user: {
+        nik: nikVal,
+        nama: String((rows[i] && rows[i][1]) || '').trim() || nikVal,
+        role: resolveAuthRole({ roleApp: roleApp }),
+        cabang: String((rows[i] && rows[i][2]) || '').trim() || 'ALL'
+      }
+    };
+  }
+
+  return { ok: false, message: 'NIK tidak ditemukan.' };
+}
+
+function getDashboardDataByAuth(nik, password) {
+  var auth = getAuthUserByNik(nik, password);
+  if (!auth.ok) return { ok: false, message: auth.message || 'Login gagal.' };
+  var base = getDashboardData();
+  var filtered = filterDashboardByUserScope(base, auth.user);
+  return {
+    ok: true,
+    data: filtered,
+    user: auth.user
+  };
 }
 
 function saveCoachingAction(obj) {
