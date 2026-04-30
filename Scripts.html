@@ -121,7 +121,7 @@
   }
 
   function showLoginScreen() {
-    const login = document.getElementById('login-screen');
+    const login = document.getElementById('login-shell');
     const app = document.getElementById('app-shell');
     const nav = document.querySelector('.nav-fix');
     if (login) login.style.display = 'block';
@@ -132,7 +132,7 @@
   }
 
   function showAppShell() {
-    const login = document.getElementById('login-screen');
+    const login = document.getElementById('login-shell');
     const app = document.getElementById('app-shell');
     const nav = document.querySelector('.nav-fix');
     if (login) login.style.display = 'none';
@@ -141,15 +141,11 @@
   }
 
   function switchAuthMode(mode) {
-    const loginPane = document.getElementById('auth-login-pane');
-    const regPane = document.getElementById('auth-register-pane');
-    const btnLogin = document.getElementById('auth-tab-login');
-    const btnReg = document.getElementById('auth-tab-register');
+    const loginPane = document.querySelector('#login-shell .login-card:not(#register-shell)');
+    const regPane = document.getElementById('register-shell');
     const isLogin = mode !== 'register';
     if (loginPane) loginPane.style.display = isLogin ? 'block' : 'none';
-    if (regPane) regPane.style.display = isLogin ? 'none' : 'block';
-    if (btnLogin) btnLogin.classList.toggle('active', isLogin);
-    if (btnReg) btnReg.classList.toggle('active', !isLogin);
+    if (regPane) regPane.classList.toggle('d-none', isLogin);
   }
 
   function loadAuthReferenceData() {
@@ -193,6 +189,11 @@
     setValue('auth-reg-cabang', rec.cabang || '');
   }
 
+  // Compatibility with inline handlers in Index.html
+  function onAuthRegisterNikChange() {
+    onAuthRegNikChange();
+  }
+
   function onAuthRegNamaChange() {
     const nama = String(getValue('auth-reg-nama') || '').trim().toUpperCase();
     const rec = (authReference.employees || []).find(r => String(r.nama || '').trim().toUpperCase() === nama);
@@ -202,9 +203,13 @@
     setValue('auth-reg-cabang', rec.cabang || '');
   }
 
+  function onAuthRegisterNamaChange() {
+    onAuthRegNamaChange();
+  }
+
   function loginInternal() {
-    const nik = getValue('auth-login-nik');
-    const password = getValue('auth-login-password');
+    const nik = getValue('login-nik');
+    const password = getValue('login-password');
     if (!nik || !password) {
       Swal.fire('Validasi', 'NIK dan Password wajib diisi.', 'warning');
       return;
@@ -252,8 +257,8 @@
         }
         Swal.fire('Sukses', out.message || 'Pendaftaran berhasil', 'success');
         switchAuthMode('login');
-        setValue('auth-login-nik', payload.nik);
-        setValue('auth-login-password', '');
+        setValue('login-nik', payload.nik);
+        setValue('login-password', '');
       })
       .withFailureHandler(err => {
         Swal.fire('Error', err && err.message ? err.message : 'Gagal mendaftar', 'error');
@@ -265,7 +270,7 @@
     clearAuthSession();
     sessionStorage.removeItem(storageKey);
     showLoginScreen();
-    setValue('auth-login-password', '');
+    setValue('login-password', '');
   }
 
   function setDefaultDates() {
