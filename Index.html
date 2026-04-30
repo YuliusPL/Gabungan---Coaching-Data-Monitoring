@@ -14,7 +14,66 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <?!= include('Styles'); ?>
 </head>
-<body onload="initApp()">
+<body onload="safeInitApp()">
+  <div id="login-shell" class="login-shell">
+    <div class="login-card card-mewah">
+      <div class="section-chip admin-chip">Secure Access</div>
+      <h5 class="mb-1 fw-bold">Masuk Aplikasi</h5>
+      <p class="section-desc mb-3">Gunakan NIK dan password internal.</p>
+      <div class="row g-2">
+        <div class="col-12">
+          <label class="form-label-lite">NIK / User ID</label>
+          <input type="text" id="login-nik" class="form-control input-elegant" placeholder="Masukkan NIK">
+        </div>
+        <div class="col-12">
+          <label class="form-label-lite">Password</label>
+          <input type="password" id="login-password" class="form-control input-elegant" placeholder="Masukkan password">
+        </div>
+      </div>
+      <button type="button" class="btn btn-admin-main w-100 fw-bold py-2 mt-3" onclick="submitLogin()">
+        <i class="bi bi-box-arrow-in-right me-1"></i>Masuk
+      </button>
+      <button type="button" class="btn btn-link w-100 mt-2" onclick="switchAuthMode('register')">Belum punya akun? Daftar</button>
+    </div>
+
+    <div class="login-card card-mewah d-none" id="register-shell">
+      <h5 class="mb-1 fw-bold">Daftar User ID</h5>
+      <p class="section-desc mb-3">NIK/Nama sinkron otomatis dari data karyawan.</p>
+      <div class="row g-2">
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">NIK</label>
+          <input type="text" id="auth-reg-nik" class="form-control input-elegant" list="auth-reg-nik-list" oninput="onAuthRegisterNikChange()">
+          <datalist id="auth-reg-nik-list"></datalist>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">Nama</label>
+          <input type="text" id="auth-reg-nama" class="form-control input-elegant" list="auth-reg-nama-list" oninput="onAuthRegisterNamaChange()">
+          <datalist id="auth-reg-nama-list"></datalist>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">Jabatan (otomatis)</label>
+          <input type="text" id="auth-reg-jabatan" class="form-control input-elegant" readonly>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">Cabang</label>
+          <select id="auth-reg-cabang" class="form-select input-elegant"></select>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">Password</label>
+          <input type="password" id="auth-reg-password" class="form-control input-elegant">
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-lite">Re Password</label>
+          <input type="password" id="auth-reg-repassword" class="form-control input-elegant">
+        </div>
+      </div>
+      <button type="button" class="btn btn-admin-main w-100 fw-bold py-2 mt-3" onclick="submitRegisterFromLogin()">
+        <i class="bi bi-person-plus-fill me-1"></i>Daftar
+      </button>
+      <button type="button" class="btn btn-link w-100 mt-2" onclick="switchAuthMode('login')">Sudah punya akun? Masuk</button>
+    </div>
+  </div>
+
   <div id="loader-global">
     <div class="loader-card">
       <div class="spinner-grow text-primary"></div>
@@ -23,7 +82,7 @@
     </div>
   </div>
 
-  <div id="app-shell">
+  <div id="app-shell" style="display:none;">
     <header class="top-shell">
       <div class="header-box">
         <div class="header-row">
@@ -93,37 +152,262 @@
         <section class="page-panel" id="panel-admin">
           <div class="page-scroll">
             <div id="v-admin">
-              <div class="card-mewah card-admin shadow-sm">
-                <div class="section-chip admin-chip">Admin Center</div>
-                <h6 class="section-title-main">Upload Data Excel</h6>
-                <p class="section-desc">Unggah data harian achievement, pencairan, atau pipeline dengan format Excel/CSV.</p>
+              <div class="section-hero section-hero-admin">
+                <div>
+                  <span class="section-chip admin-chip">Admin Center</span>
+                  <h2>Kelola data master dashboard</h2>
+                  <p>Manajemen Data Karyawan, User Management, dan Upload Data Excel dalam satu tempat.</p>
+                </div>
+                <div class="hero-icon">
+                  <i class="bi bi-shield-lock-fill"></i>
+                </div>
+              </div>
 
-                <div class="row g-3">
-                  <div class="col-12 col-md-4">
-                    <label class="form-label-lite">Tanggal Data</label>
-                    <input type="date" id="u-t" class="form-control input-elegant">
+              <div class="admin-subnav card-mewah">
+                <button type="button" class="admin-subtab active" id="admin-tab-karyawan" onclick="switchAdminSection('karyawan')">
+                  <i class="bi bi-people-fill"></i>
+                  <span>Data Karyawan</span>
+                </button>
+                <button type="button" class="admin-subtab" id="admin-tab-users" onclick="switchAdminSection('users')">
+                  <i class="bi bi-person-gear"></i>
+                  <span>User Management</span>
+                </button>
+                <button type="button" class="admin-subtab" id="admin-tab-upload" onclick="switchAdminSection('upload')">
+                  <i class="bi bi-cloud-arrow-up-fill"></i>
+                  <span>Upload Data Excel</span>
+                </button>
+              </div>
+
+              <div id="admin-section-karyawan" class="admin-section active">
+                <div class="card-mewah">
+                  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                      <h6 class="section-title-main mb-1">Data Karyawan</h6>
+                      <p class="section-desc mb-0">Daftar master karyawan dari DB_Karyawan / Master_Karyawan.</p>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button type="button" class="btn btn-sm btn-admin-main" onclick="openAdminEmployeeCreate()">
+                        <i class="bi bi-plus-circle me-1"></i>Tambah
+                      </button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadAdminKaryawan()">
+                        <i class="bi bi-arrow-repeat me-1"></i>Refresh
+                      </button>
+                    </div>
                   </div>
-
-                  <div class="col-12 col-md-4">
-                    <label class="form-label-lite">Jenis Upload</label>
-                    <select id="u-j" class="form-select input-elegant">
-                      <option value="1">Achv CS</option>
-                      <option value="2">Achv SPV</option>
-                      <option value="4">Cair CS</option>
-                      <option value="5">Cair SPV</option>
-                      <option value="7">Pipeline</option>
-                    </select>
+                  <div class="row g-2 mt-1">
+                    <div class="col-12 col-lg-8">
+                      <input type="text" id="admin-karyawan-search" class="form-control input-elegant" placeholder="Cari NIK, Nama, Cabang, Jabatan..." oninput="renderAdminKaryawanTable()">
+                    </div>
+                    <div class="col-6 col-lg-2">
+                      <div class="admin-mini-stat">
+                        <small>Total Data</small>
+                        <b id="admin-karyawan-total">0</b>
+                      </div>
+                    </div>
+                    <div class="col-6 col-lg-1">
+                      <div class="admin-mini-stat">
+                        <small>Aktif</small>
+                        <b id="admin-karyawan-aktif">0</b>
+                      </div>
+                    </div>
+                    <div class="col-6 col-lg-1">
+                      <div class="admin-mini-stat">
+                        <small>Nonaktif</small>
+                        <b id="admin-karyawan-nonaktif">0</b>
+                      </div>
+                    </div>
+                    <div class="col-6 col-lg-2">
+                      <div class="admin-mini-stat">
+                        <small>Cabang</small>
+                        <b id="admin-karyawan-cabang">0</b>
+                      </div>
+                    </div>
                   </div>
-
-                  <div class="col-12 col-md-4">
-                    <label class="form-label-lite">File Excel</label>
-                    <input type="file" id="u-f" class="form-control input-elegant" accept=".xlsx,.xls,.csv">
+                  <div class="table-responsive mt-3 admin-karyawan-table-wrap">
+                    <table class="table table-hover align-middle mb-0 admin-karyawan-table">
+                      <thead>
+                        <tr>
+                          <th style="min-width:120px;">Timestamp</th>
+                          <th style="min-width:130px;">NIK/NPK</th>
+                          <th style="min-width:200px;">Nama Karyawan</th>
+                          <th style="min-width:150px;">Jabatan</th>
+                          <th style="min-width:180px;">Divisi/Departemen</th>
+                          <th style="min-width:160px;">Cabang / Lokasi</th>
+                          <th style="min-width:120px;">Role User</th>
+                          <th style="min-width:140px;">NIK Atasan</th>
+                          <th style="min-width:180px;">Nama Atasan</th>
+                          <th style="min-width:150px;">NIK Atasan 2</th>
+                          <th style="min-width:190px;">Nama Atasan 2</th>
+                          <th style="min-width:190px;">Email</th>
+                          <th style="min-width:120px;">No WA</th>
+                          <th style="min-width:120px;">Status</th>
+                          <th style="min-width:120px;">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody id="admin-karyawan-body">
+                        <tr><td colspan="15" class="empty-state">Memuat data karyawan...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="card-mewah mt-3 admin-karyawan-editor" id="admin-karyawan-editor">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h6 class="section-title-main mb-0" id="admin-karyawan-editor-title">Tambah Data Karyawan</h6>
+                      <span class="small text-muted" id="admin-karyawan-editor-mode">MODE TAMBAH</span>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-12 col-md-4">
+                        <label class="form-label-lite">NIK/NPK</label>
+                        <input type="text" id="adm-form-nik" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-8">
+                        <label class="form-label-lite">Nama Karyawan</label>
+                        <input type="text" id="adm-form-nama" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">Jabatan</label>
+                        <input type="text" id="adm-form-jabatan" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">Divisi/Departemen</label>
+                        <input type="text" id="adm-form-divisi" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">Cabang / Lokasi</label>
+                        <input type="text" id="adm-form-cabang" class="form-control input-elegant" list="adm-form-cabang-list" placeholder="Pilih / ketik cabang">
+                        <datalist id="adm-form-cabang-list"></datalist>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">Role User</label>
+                        <select id="adm-form-role-user" class="form-select input-elegant">
+                          <option value="">Pilih Role</option>
+                          <option value="ADMIN">ADMIN</option>
+                          <option value="HEAD">HEAD</option>
+                          <option value="BM">BM</option>
+                          <option value="SUPERVISOR">SUPERVISOR</option>
+                          <option value="STAFF">STAFF</option>
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label-lite">NIK Atasan Langsung</label>
+                        <input type="text" id="adm-form-nik-atasan" class="form-control input-elegant" list="adm-form-nik-list" placeholder="Cari NIK Atasan" oninput="onAdminAtasanNikChange(1)" onchange="onAdminAtasanNikChange(1)">
+                      </div>
+                      <div class="col-12 col-md-8">
+                        <label class="form-label-lite">Nama Atasan Langsung</label>
+                        <input type="text" id="adm-form-nama-atasan" class="form-control input-elegant" list="adm-form-nama-list" placeholder="Cari Nama Atasan" oninput="onAdminAtasanNamaChange(1)" onchange="onAdminAtasanNamaChange(1)">
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label-lite">NIK Atasan Level 2</label>
+                        <input type="text" id="adm-form-nik-atasan2" class="form-control input-elegant" list="adm-form-nik-list" placeholder="Cari NIK Atasan Level 2" oninput="onAdminAtasanNikChange(2)" onchange="onAdminAtasanNikChange(2)">
+                      </div>
+                      <div class="col-12 col-md-8">
+                        <label class="form-label-lite">Nama Atasan Level 2</label>
+                        <input type="text" id="adm-form-nama-atasan2" class="form-control input-elegant" list="adm-form-nama-list" placeholder="Cari Nama Atasan Level 2" oninput="onAdminAtasanNamaChange(2)" onchange="onAdminAtasanNamaChange(2)">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">Email Karyawan</label>
+                        <input type="email" id="adm-form-email" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label-lite">No WA</label>
+                        <input type="text" id="adm-form-wa" class="form-control input-elegant">
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label-lite">Status Karyawan</label>
+                        <select id="adm-form-status" class="form-select input-elegant">
+                          <option value="AKTIF">AKTIF</option>
+                          <option value="TIDAK AKTIF">TIDAK AKTIF</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                      <button type="button" class="btn btn-admin-main" onclick="saveAdminEmployeeFromForm()">
+                        <i class="bi bi-floppy-fill me-1"></i>Simpan
+                      </button>
+                      <button type="button" class="btn btn-outline-danger" onclick="deleteAdminEmployeeFromForm()">
+                        <i class="bi bi-trash-fill me-1"></i>Hapus
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary" onclick="resetAdminEmployeeForm()">
+                        <i class="bi bi-x-circle me-1"></i>Batal
+                      </button>
+                    </div>
+                    <datalist id="adm-form-nik-list"></datalist>
+                    <datalist id="adm-form-nama-list"></datalist>
                   </div>
                 </div>
+              </div>
 
-                <button class="btn btn-admin-main w-100 fw-bold py-3 shadow-sm mt-4" onclick="execU()">
-                  <i class="bi bi-upload me-2"></i>UNGGAH DATA
-                </button>
+              <div id="admin-section-users" class="admin-section">
+                <div class="card-mewah admin-user-card">
+                  <h6 class="section-title-main">User Management - Pendaftaran User ID</h6>
+                  <p class="section-desc mb-2">Form pendaftaran akun internal (NIK/Nama auto search, Jabatan otomatis, Cabang dropdown).</p>
+                  <div class="row g-3">
+                    <div class="col-12 col-lg-6">
+                      <label class="form-label-lite">NIK (Auto Search)</label>
+                      <input type="text" id="reg-nik" class="form-control input-elegant" list="reg-nik-list" placeholder="Ketik / pilih NIK" onchange="onRegisterNikChange()" oninput="onRegisterNikChange()">
+                      <datalist id="reg-nik-list"></datalist>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                      <label class="form-label-lite">Nama (Auto Search)</label>
+                      <input type="text" id="reg-nama" class="form-control input-elegant" list="reg-nama-list" placeholder="Ketik / pilih Nama Karyawan" onchange="onRegisterNamaChange()" oninput="onRegisterNamaChange()">
+                      <datalist id="reg-nama-list"></datalist>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label-lite">Jabatan (Otomatis)</label>
+                      <input type="text" id="reg-jabatan" class="form-control input-elegant" readonly>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label-lite">Cabang (Dropdown)</label>
+                      <select id="reg-cabang" class="form-select input-elegant"></select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label-lite">Password</label>
+                      <input type="password" id="reg-password" class="form-control input-elegant" placeholder="Isi password">
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label-lite">Re Password</label>
+                      <input type="password" id="reg-repassword" class="form-control input-elegant" placeholder="Ulangi password">
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-admin-main w-100 fw-bold py-3 shadow-sm mt-4" onclick="registerNewUserId()">
+                    <i class="bi bi-person-plus-fill me-2"></i>DAFTAR USER ID
+                  </button>
+                  <p class="admin-user-tip mb-0">Role aplikasi diisi otomatis dari Jabatan: Head → HEAD, Branch Manager → BM, Supervisor → SUPERVISOR, lainnya → STAFF.</p>
+                </div>
+              </div>
+
+              <div id="admin-section-upload" class="admin-section">
+                <div class="card-mewah card-admin shadow-sm">
+                  <div class="section-chip admin-chip">Admin Center</div>
+                  <h6 class="section-title-main">Upload Data Excel</h6>
+                  <p class="section-desc">Unggah data harian achievement, pencairan, atau pipeline dengan format Excel/CSV.</p>
+
+                  <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label-lite">Tanggal Data</label>
+                      <input type="date" id="u-t" class="form-control input-elegant">
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                      <label class="form-label-lite">Jenis Upload</label>
+                      <select id="u-j" class="form-select input-elegant">
+                        <option value="1">Achv CS</option>
+                        <option value="2">Achv SPV</option>
+                        <option value="4">Cair CS</option>
+                        <option value="5">Cair SPV</option>
+                        <option value="7">Pipeline</option>
+                      </select>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                      <label class="form-label-lite">File Excel</label>
+                      <input type="file" id="u-f" class="form-control input-elegant" accept=".xlsx,.xls,.csv">
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn-admin-main w-100 fw-bold py-3 shadow-sm mt-4" onclick="execU()">
+                    <i class="bi bi-upload me-2"></i>UNGGAH DATA
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -133,23 +417,23 @@
   </div>
 
   <nav class="nav-fix">
-    <button onclick="switchPage('home')" class="nav-item active" id="n-home">
+    <button type="button" onclick="switchPage('home')" class="nav-item active" id="n-home">
       <span class="nav-icon nav-home"><i class="bi bi-speedometer2"></i></span>
       <span class="nav-text">Home</span>
     </button>
-    <button onclick="switchPage('pipe')" class="nav-item" id="n-pipe">
+    <button type="button" onclick="switchPage('pipe')" class="nav-item" id="n-pipe">
       <span class="nav-icon nav-pipe"><i class="bi bi-funnel-fill"></i></span>
       <span class="nav-text">Pipeline</span>
     </button>
-    <button onclick="switchPage('report')" class="nav-item" id="n-report">
+    <button type="button" onclick="switchPage('report')" class="nav-item" id="n-report">
       <span class="nav-icon nav-report"><i class="bi bi-file-earmark-text-fill"></i></span>
       <span class="nav-text">Report</span>
     </button>
-    <button onclick="switchPage('coaching')" class="nav-item" id="n-coaching">
+    <button type="button" onclick="switchPage('coaching')" class="nav-item" id="n-coaching">
       <span class="nav-icon nav-coaching"><i class="bi bi-person-badge-fill"></i></span>
       <span class="nav-text">Coaching</span>
     </button>
-    <button onclick="switchPage('admin')" class="nav-item" id="n-admin">
+    <button type="button" onclick="switchPage('admin')" class="nav-item" id="n-admin">
       <span class="nav-icon nav-admin"><i class="bi bi-shield-lock-fill"></i></span>
       <span class="nav-text">Admin</span>
     </button>

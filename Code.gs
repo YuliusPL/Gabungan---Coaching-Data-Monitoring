@@ -5,6 +5,75 @@
 
 var DB_ID = '1fKi00TOdtqwlyP6Uk20sGbJHrm_dsQ5frlkFm6jMAzE';
 
+// Embedded admin users (development bootstrap)
+// NIK | Nama | Cabang | Password | Role_App | Status_User
+var EMBEDDED_ADMIN_USERS = {
+  '2510285': { nik: '2510285', nama: 'YULIUS PUJI LAKSONO', cabang: 'LEUWIPANJANG', password: '2510285', roleApp: 'ADMIN', statusUser: 'AKTIF' },
+  '1234567': { nik: '1234567', nama: 'ADMIN1', cabang: 'LEUWIPANJANG', password: '1234567', roleApp: 'ADMIN', statusUser: 'AKTIF' },
+  '1111111': { nik: '1111111', nama: 'ADMIN2', cabang: 'LEUWIPANJANG', password: '1111111', roleApp: 'ADMIN', statusUser: 'AKTIF' },
+  '9999999': { nik: '9999999', nama: 'ADMIN3', cabang: 'LEUWIPANJANG', password: '9999999', roleApp: 'ADMIN', statusUser: 'AKTIF' }
+};
+
+function getEmbeddedAdminByNik(nik) {
+  var key = String(nik || '').trim();
+  if (!key) return null;
+  var rec = EMBEDDED_ADMIN_USERS[key];
+  if (!rec) return null;
+  if (String(rec.statusUser || '').toUpperCase() !== 'AKTIF') return null;
+  return rec;
+}
+
+function authenticateUserId(nik, password) {
+  var userNik = String(nik || '').trim();
+  var pass = String(password || '');
+  if (!userNik || !pass) return { ok: false, message: 'User ID dan Password wajib diisi.' };
+
+  var embedded = getEmbeddedAdminByNik(userNik);
+  if (embedded && String(embedded.password || '') === pass) {
+    return {
+      ok: true,
+      message: 'Login berhasil.',
+      user: {
+        nik: embedded.nik,
+        nama: embedded.nama,
+        cabang: embedded.cabang || 'ALL',
+        role: 'Admin',
+        roleApp: embedded.roleApp || 'ADMIN',
+        statusUser: embedded.statusUser || 'AKTIF'
+      }
+    };
+  }
+
+  var ss = getDB();
+  var sh = ss.getSheetByName('User_ID');
+  if (!sh || sh.getLastRow() < 2) return { ok: false, message: 'User tidak ditemukan.' };
+  var rows = sh.getDataRange().getValues();
+  for (var r = 1; r < rows.length; r++) {
+    var rowNik = String((rows[r] && rows[r][0]) || '').trim();
+    var rowPass = String((rows[r] && rows[r][3]) || '');
+    var rowStatus = String((rows[r] && rows[r][5]) || 'AKTIF').trim().toUpperCase();
+    if (!rowNik || rowNik !== userNik) continue;
+    if (rowStatus && rowStatus !== 'AKTIF' && rowStatus !== 'ACTIVE') {
+      return { ok: false, message: 'Status user tidak aktif.' };
+    }
+    if (rowPass !== pass) return { ok: false, message: 'Password salah.' };
+    var roleApp = String((rows[r] && rows[r][4]) || '').trim().toUpperCase() || 'STAFF';
+    return {
+      ok: true,
+      message: 'Login berhasil.',
+      user: {
+        nik: rowNik,
+        nama: String((rows[r] && rows[r][1]) || '').trim() || rowNik,
+        cabang: String((rows[r] && rows[r][2]) || '').trim() || 'ALL',
+        role: roleApp === 'ADMIN' ? 'Admin' : roleApp,
+        roleApp: roleApp,
+        statusUser: rowStatus || 'AKTIF'
+      }
+    };
+  }
+  return { ok: false, message: 'User tidak ditemukan.' };
+}
+
 function getDB() {
   return SpreadsheetApp.openById(DB_ID);
 }
@@ -25,8 +94,52 @@ function getUserData() {
     var email = Session.getActiveUser().getEmail().toLowerCase();
     var ss = getDB();
     var sh = ss.getSheetByName('User_ID');
+    var shEmp = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
     var data = sh ? sh.getDataRange().getValues() : [];
-    if (email.includes("yulius") || email === "") return { email: email, nama: "YULIUS PUJI LAKSONO", role: "Admin", cabang: "ALL" };
+    var devAdminNik = '2510285';
+    if (email.includes("yulius")) return { email: email, nama: "YULIUS PUJI LAKSONO", role: "Admin", cabang: "ALL", nik: devAdminNik };
+
+    // Development override: NIK tertentu diperlakukan sebagai Admin
+    // berdasarkan mapping email di DB_Karyawan. Jika Apps Script tidak
+    // memberikan email aktif (kosong), tetap izinkan mode dev.
+    if (shEmp && shEmp.getLastRow() > 1) {
+      var empRows = shEmp.getDataRange().getValues();
+      var hdr = empRows[0] || [];
+      var idxNik = -1, idxNama = -1, idxCab = -1, idxEmail = -1;
+      for (var c = 0; c < hdr.length; c++) {
+        var lab = String(hdr[c] || '').toLowerCase();
+        if (idxNik < 0 && (lab.indexOf('nik') !== -1 || lab.indexOf('npk') !== -1)) idxNik = c;
+        if (idxNama < 0 && lab.indexOf('nama') !== -1) idxNama = c;
+        if (idxCab < 0 && (lab.indexOf('cabang') !== -1 || lab.indexOf('branch') !== -1)) idxCab = c;
+        if (idxEmail < 0 && lab.indexOf('email') !== -1) idxEmail = c;
+      }
+      if (idxNik < 0) idxNik = 1;
+      if (idxNama < 0) idxNama = 2;
+      if (idxCab < 0) idxCab = 5;
+      if (idxEmail < 0) idxEmail = 11;
+
+      for (var r = 1; r < empRows.length; r++) {
+        var nik = String((empRows[r] && empRows[r][idxNik]) || '').trim();
+        var empEmail = String((empRows[r] && empRows[r][idxEmail]) || '').trim().toLowerCase();
+        var embeddedAdmin = getEmbeddedAdminByNik(nik);
+        if (!embeddedAdmin) {
+          // Backward compatibility for previous single dev override
+          if (nik !== devAdminNik) continue;
+          embeddedAdmin = { nik: nik, nama: String((empRows[r] && empRows[r][idxNama]) || 'ADMIN DEV').trim() || 'ADMIN DEV', cabang: String((empRows[r] && empRows[r][idxCab]) || 'ALL').trim() || 'ALL' };
+        }
+        if (email === '' || (empEmail && email === empEmail)) {
+          return {
+            email: email || empEmail,
+            nama: embeddedAdmin.nama || String((empRows[r] && empRows[r][idxNama]) || 'ADMIN DEV').trim() || 'ADMIN DEV',
+            role: 'Admin',
+            cabang: embeddedAdmin.cabang || String((empRows[r] && empRows[r][idxCab]) || 'ALL').trim() || 'ALL',
+            nik: embeddedAdmin.nik || nik
+          };
+        }
+      }
+    }
+
+    if (email === "") return { email: email, nama: "ADMIN", role: "Admin", cabang: "ALL" };
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] && data[i][0].toLowerCase() === email) return { email: data[i][0], nama: data[i][1], role: data[i][3], cabang: data[i][4] };
     }
@@ -147,6 +260,603 @@ function getCoachingFullData() {
     progress: shP.getDataRange().getValues(),
     regionMap: shR ? shR.getDataRange().getValues() : [],
     satuan: shS ? shS.getDataRange().getValues() : []
+  };
+}
+
+function getEmployeeMasterData() {
+  var ss = getDB();
+  var sh = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
+  if (!sh) return [];
+  return sh.getDataRange().getValues();
+}
+
+function getDbKaryawanIndexMap(headers) {
+  var normalizedHeaders = (headers || []).map(function(h) {
+    return String(h || '').toLowerCase().trim();
+  });
+
+  function findIndex(candidates, fallback) {
+    for (var i = 0; i < normalizedHeaders.length; i++) {
+      var label = normalizedHeaders[i];
+      var found = candidates.some(function(c) {
+        return label.indexOf(String(c).toLowerCase()) !== -1;
+      });
+      if (found) return i;
+    }
+    return fallback;
+  }
+
+  // Default fallback mengikuti struktur DB_Karyawan (A..N)
+  return {
+    timestamp: findIndex(['timestamp', 'waktu'], 0),
+    nik: findIndex(['nik', 'npk'], 1),
+    nama: findIndex(['nama karyawan', 'nama'], 2),
+    jabatan: findIndex(['jabatan', 'posisi', 'position'], 3),
+    divisi: findIndex(['divisi', 'departemen', 'department'], 4),
+    cabang: findIndex(['cabang', 'lokasi kerja', 'branch'], 5),
+    roleUser: findIndex(['role user', 'role'], 6),
+    nikAtasan: findIndex(['nik atasan langsung'], 7),
+    namaAtasan: findIndex(['nama atasan langsung'], 8),
+    nikAtasan2: findIndex(['nik atasan dari atasan langsung', 'nik atasan 2'], 9),
+    namaAtasan2: findIndex(['nama atasan dari atasan langsung', 'nama atasan 2'], 10),
+    email: findIndex(['email karyawan', 'email'], 11),
+    wa: findIndex(['no wa', 'wa', 'whatsapp'], 12),
+    statusKaryawan: findIndex(['status karyawan', 'status aktif', 'status'], 13)
+  };
+}
+
+function getAdminEmployeeData() {
+  var rows = getEmployeeMasterData();
+  if (!rows || rows.length === 0) {
+    return {
+      headers: [],
+      rows: [],
+      indexMap: {},
+      summary: { total: 0, active: 0, nonActive: 0, branches: 0, roles: 0, hasHierarchy: 0 }
+    };
+  }
+
+  var headers = rows[0] || [];
+  var dataRows = rows.slice(1);
+  var idx = getDbKaryawanIndexMap(headers);
+
+  var uniqueBranches = {};
+  var uniqueRoles = {};
+  var activeCount = 0;
+  var nonActiveCount = 0;
+  var hierarchyCount = 0;
+
+  var normalizedRows = dataRows.map(function(r) {
+    var branch = String((r && r[idx.cabang]) || '').trim().toUpperCase();
+    var role = String((r && r[idx.roleUser]) || '').trim().toUpperCase();
+    var status = String((r && r[idx.statusKaryawan]) || '').trim().toUpperCase();
+    var nikAtasan = String((r && r[idx.nikAtasan]) || '').trim();
+    var nikAtasan2 = String((r && r[idx.nikAtasan2]) || '').trim();
+
+    if (branch) uniqueBranches[branch] = true;
+    if (role) uniqueRoles[role] = true;
+    if (status === 'AKTIF' || status === 'ACTIVE') activeCount++;
+    else if (status) nonActiveCount++;
+    if (nikAtasan || nikAtasan2) hierarchyCount++;
+
+    return {
+      timestamp: r[idx.timestamp] || '',
+      nik: String(r[idx.nik] || '').trim(),
+      nama: String(r[idx.nama] || '').trim(),
+      jabatan: String(r[idx.jabatan] || '').trim(),
+      divisi: String(r[idx.divisi] || '').trim(),
+      cabang: String(r[idx.cabang] || '').trim(),
+      roleUser: String(r[idx.roleUser] || '').trim(),
+      nikAtasan: nikAtasan,
+      namaAtasan: String(r[idx.namaAtasan] || '').trim(),
+      nikAtasan2: nikAtasan2,
+      namaAtasan2: String(r[idx.namaAtasan2] || '').trim(),
+      email: String(r[idx.email] || '').trim(),
+      wa: String(r[idx.wa] || '').trim(),
+      statusKaryawan: String(r[idx.statusKaryawan] || '').trim()
+    };
+  });
+
+  return {
+    headers: headers,
+    rows: normalizedRows,
+    indexMap: idx,
+    summary: {
+      total: normalizedRows.length,
+      active: activeCount,
+      nonActive: nonActiveCount,
+      branches: Object.keys(uniqueBranches).length,
+      roles: Object.keys(uniqueRoles).length,
+      hasHierarchy: hierarchyCount
+    }
+  };
+}
+
+function saveAdminEmployee(payload) {
+  payload = payload || {};
+  var originalNik = String(payload.originalNik || '').trim();
+  var nik = String(payload.nik || '').trim();
+  var nama = String(payload.nama || '').trim();
+  if (!nik || !nama) return { ok: false, message: 'NIK dan Nama wajib diisi.' };
+
+  var ss = getDB();
+  var sh = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
+  if (!sh) return { ok: false, message: 'Sheet DB_Karyawan / Master_Karyawan tidak ditemukan.' };
+
+  var values = sh.getDataRange().getValues();
+  var headers = values[0] || [];
+  var idx = getDbKaryawanIndexMap(headers);
+
+  var writeRow = new Array(headers.length).fill('');
+  writeRow[idx.timestamp] = payload.timestamp ? new Date(payload.timestamp) : new Date();
+  writeRow[idx.nik] = nik;
+  writeRow[idx.nama] = nama;
+  writeRow[idx.jabatan] = String(payload.jabatan || '').trim();
+  writeRow[idx.divisi] = String(payload.divisi || '').trim();
+  writeRow[idx.cabang] = String(payload.cabang || '').trim();
+  writeRow[idx.roleUser] = String(payload.roleUser || '').trim();
+  writeRow[idx.nikAtasan] = String(payload.nikAtasan || '').trim();
+  writeRow[idx.namaAtasan] = String(payload.namaAtasan || '').trim();
+  writeRow[idx.nikAtasan2] = String(payload.nikAtasan2 || '').trim();
+  writeRow[idx.namaAtasan2] = String(payload.namaAtasan2 || '').trim();
+  writeRow[idx.email] = String(payload.email || '').trim();
+  writeRow[idx.wa] = String(payload.wa || '').trim();
+  writeRow[idx.statusKaryawan] = String(payload.statusKaryawan || 'AKTIF').trim();
+
+  var targetRow = -1;
+  var originalRow = -1;
+  for (var r = 1; r < values.length; r++) {
+    var rowNik = String((values[r] && values[r][idx.nik]) || '').trim();
+    if (rowNik === nik) {
+      targetRow = r + 1;
+    }
+    if (originalNik && rowNik === originalNik) {
+      originalRow = r + 1;
+    }
+  }
+
+  if (originalNik && originalNik !== nik) {
+    // Saat edit dan NIK diubah, cegah bentrok NIK existing lain.
+    if (targetRow > 0 && targetRow !== originalRow) {
+      return { ok: false, message: 'NIK baru sudah terdaftar. Gunakan NIK lain.' };
+    }
+    targetRow = originalRow;
+  }
+
+  if (targetRow > 0) {
+    sh.getRange(targetRow, 1, 1, headers.length).setValues([writeRow]);
+  } else {
+    sh.appendRow(writeRow);
+  }
+  CacheService.getScriptCache().remove("db_v181_no_tele");
+  return { ok: true, message: targetRow > 0 ? 'Data karyawan berhasil diperbarui.' : 'Data karyawan berhasil ditambahkan.' };
+}
+
+function deleteAdminEmployeeByNik(nik) {
+  var key = String(nik || '').trim();
+  if (!key) return { ok: false, message: 'NIK wajib diisi.' };
+  var ss = getDB();
+  var sh = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
+  if (!sh) return { ok: false, message: 'Sheet DB_Karyawan / Master_Karyawan tidak ditemukan.' };
+  var values = sh.getDataRange().getValues();
+  if (!values || values.length < 2) return { ok: false, message: 'Data karyawan kosong.' };
+  var idx = getDbKaryawanIndexMap(values[0] || []);
+  for (var r = values.length - 1; r >= 1; r--) {
+    if (String((values[r] && values[r][idx.nik]) || '').trim() === key) {
+      sh.deleteRow(r + 1);
+      CacheService.getScriptCache().remove("db_v181_no_tele");
+      return { ok: true, message: 'Data karyawan berhasil dihapus.' };
+    }
+  }
+  return { ok: false, message: 'NIK tidak ditemukan.' };
+}
+
+function isValidAdminDeletePin(pin) {
+  var key = String(pin || '').trim();
+  if (!key) return false;
+  var nikList = Object.keys(EMBEDDED_ADMIN_USERS || {});
+  for (var i = 0; i < nikList.length; i++) {
+    var rec = EMBEDDED_ADMIN_USERS[nikList[i]];
+    if (!rec) continue;
+    if (String(rec.statusUser || '').toUpperCase() !== 'AKTIF') continue;
+    if (String(rec.password || '') === key) return true;
+  }
+  return false;
+}
+
+function deleteAdminEmployeeByNikSecure(nik, adminPin) {
+  if (!isValidAdminDeletePin(adminPin)) {
+    return { ok: false, message: 'PIN Admin tidak valid. Hapus permanen dibatalkan.' };
+  }
+  return deleteAdminEmployeeByNik(nik);
+}
+
+function verifyAdminDeletePin(adminPin) {
+  if (!isValidAdminDeletePin(adminPin)) {
+    return { ok: false, message: 'PIN Admin tidak valid.' };
+  }
+  return { ok: true, message: 'PIN Admin valid.' };
+}
+
+function deleteAdminEmployeeByNikMode(nik, mode) {
+  var modeVal = String(mode || 'hard').toLowerCase();
+  if (modeVal === 'soft') return deactivateAdminEmployeeByNik(nik);
+  return deleteAdminEmployeeByNik(nik);
+}
+
+function deactivateAdminEmployeeByNik(nik) {
+  var key = String(nik || '').trim();
+  if (!key) return { ok: false, message: 'NIK wajib diisi.' };
+  var ss = getDB();
+  var sh = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
+  if (!sh) return { ok: false, message: 'Sheet DB_Karyawan / Master_Karyawan tidak ditemukan.' };
+  var values = sh.getDataRange().getValues();
+  if (!values || values.length < 2) return { ok: false, message: 'Data karyawan kosong.' };
+  var headers = values[0] || [];
+  var idx = getDbKaryawanIndexMap(headers);
+  for (var r = 1; r < values.length; r++) {
+    if (String((values[r] && values[r][idx.nik]) || '').trim() === key) {
+      var statusVal = 'TIDAK AKTIF';
+      sh.getRange(r + 1, idx.statusKaryawan + 1).setValue(statusVal);
+      return { ok: true, message: 'Karyawan dinonaktifkan (soft delete).' };
+    }
+  }
+  return { ok: false, message: 'NIK tidak ditemukan.' };
+}
+
+function getEmployeeDirectoryData() {
+  var rows = getEmployeeMasterData();
+  if (!rows || rows.length === 0) {
+    return { headers: [], records: [], byNik: {}, byName: {} };
+  }
+
+  var headers = rows[0] || [];
+  var normalizedHeaders = headers.map(function(h) {
+    return String(h || '').toLowerCase();
+  });
+
+  function headerIndex(candidates, fallback) {
+    for (var i = 0; i < normalizedHeaders.length; i++) {
+      var h = normalizedHeaders[i];
+      var found = candidates.some(function(c) { return h.indexOf(c) !== -1; });
+      if (found) return i;
+    }
+    return fallback;
+  }
+
+  var idx = {
+    timestamp: headerIndex(['timestamp', 'waktu'], 0),
+    nik: headerIndex(['nik', 'npk'], 1),
+    nama: headerIndex(['nama karyawan', 'nama'], 2),
+    jabatan: headerIndex(['jabatan', 'posisi', 'position'], 3),
+    divisi: headerIndex(['divisi', 'departemen', 'department'], 4),
+    cabang: headerIndex(['cabang', 'lokasi kerja', 'branch'], 5),
+    role: headerIndex(['role user', 'role'], 6),
+    nikAtasan: headerIndex(['nik atasan langsung', 'atasan langsung'], 7),
+    namaAtasan: headerIndex(['nama atasan langsung'], 8),
+    nikAtasan2: headerIndex(['nik atasan dari atasan langsung'], 9),
+    namaAtasan2: headerIndex(['nama atasan dari atasan langsung'], 10),
+    email: headerIndex(['email karyawan', 'email'], 11),
+    wa: headerIndex(['no wa', 'wa', 'whatsapp'], 12),
+    status: headerIndex(['status karyawan', 'status'], 13)
+  };
+
+  var records = [];
+  var byNik = {};
+  var byName = {};
+
+  rows.slice(1).forEach(function(r) {
+    var nik = String((r && r[idx.nik]) || '').trim();
+    var nama = String((r && r[idx.nama]) || '').trim();
+    if (!nik && !nama) return;
+
+    var rec = {
+      timestamp: r[idx.timestamp] || '',
+      nik: nik,
+      nama: nama,
+      jabatan: String((r && r[idx.jabatan]) || '').trim(),
+      divisi: String((r && r[idx.divisi]) || '').trim(),
+      cabang: String((r && r[idx.cabang]) || '').trim(),
+      roleUser: String((r && r[idx.role]) || '').trim(),
+      nikAtasanLangsung: String((r && r[idx.nikAtasan]) || '').trim(),
+      namaAtasanLangsung: String((r && r[idx.namaAtasan]) || '').trim(),
+      nikAtasan2: String((r && r[idx.nikAtasan2]) || '').trim(),
+      namaAtasan2: String((r && r[idx.namaAtasan2]) || '').trim(),
+      email: String((r && r[idx.email]) || '').trim(),
+      noWa: String((r && r[idx.wa]) || '').trim(),
+      statusKaryawan: String((r && r[idx.status]) || '').trim()
+    };
+
+    records.push(rec);
+    if (nik) byNik[nik] = rec;
+    if (nama) byName[nama.toUpperCase()] = rec;
+  });
+
+  return {
+    headers: headers,
+    records: records,
+    byNik: byNik,
+    byName: byName
+  };
+}
+
+function getUserRegistrationReferenceData() {
+  var directory = getEmployeeDirectoryData();
+  var records = directory.records || [];
+  var uniqueBranches = {};
+
+  var employees = records
+    .filter(function(rec) {
+      var status = String(rec.statusKaryawan || '').toUpperCase().trim();
+      return status === '' || status === 'AKTIF' || status === 'ACTIVE';
+    })
+    .map(function(rec) {
+      var cab = String(rec.cabang || '').trim();
+      if (cab) uniqueBranches[cab.toUpperCase()] = cab;
+      return {
+        nik: String(rec.nik || '').trim(),
+        nama: String(rec.nama || '').trim(),
+        jabatan: String(rec.jabatan || '').trim(),
+        cabang: cab
+      };
+    })
+    .filter(function(rec) { return rec.nik && rec.nama; });
+
+  var branches = Object.keys(uniqueBranches)
+    .sort()
+    .map(function(k) { return uniqueBranches[k]; });
+
+  return {
+    employees: employees,
+    branches: branches
+  };
+}
+
+function registerUserId(payload) {
+  payload = payload || {};
+  var nik = String(payload.nik || '').trim();
+  var nama = String(payload.nama || '').trim();
+  var jabatan = String(payload.jabatan || '').trim();
+  var cabang = String(payload.cabang || '').trim();
+  var password = String(payload.password || '');
+  var rePassword = String(payload.rePassword || '');
+
+  if (!nik || !nama || !jabatan || !cabang) return { ok: false, message: 'NIK, Nama, Jabatan, dan Cabang wajib diisi.' };
+  if (!password || !rePassword) return { ok: false, message: 'Password dan Re Password wajib diisi.' };
+  if (password !== rePassword) return { ok: false, message: 'Password dan Re Password tidak sama.' };
+  if (password.length < 6) return { ok: false, message: 'Password minimal 6 karakter.' };
+
+  var ref = getUserRegistrationReferenceData();
+  var matched = (ref.employees || []).find(function(rec) {
+    return String(rec.nik || '').trim() === nik && String(rec.nama || '').trim().toUpperCase() === nama.toUpperCase();
+  });
+  if (!matched) return { ok: false, message: 'NIK dan Nama tidak cocok dengan DB_Karyawan.' };
+
+  var roleApp = deriveRoleFromJabatan(jabatan);
+  var ss = getDB();
+  var sh = ss.getSheetByName('User_ID') || ss.insertSheet('User_ID');
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(['NIK', 'NAMA', 'CABANG', 'PASSWORD', 'ROLE_APP', 'STATUS_USER', 'UPDATED_AT']);
+  }
+
+  var data = sh.getDataRange().getValues();
+  var hdr = data[0] || [];
+  var idxNik = 0;
+  var idxNama = 1;
+  var idxCab = 2;
+  var idxPass = 3;
+  var idxRole = 4;
+  var idxStatus = 5;
+  var idxUpdatedAt = 6;
+
+  // Backward compatibility: jika header lama (email,nama,...), tetap upayakan update by nik di kolom 0.
+  var targetRow = -1;
+  for (var r = 1; r < data.length; r++) {
+    if (String((data[r] && data[r][idxNik]) || '').trim() === nik) {
+      targetRow = r + 1;
+      break;
+    }
+  }
+
+  var rowValues = [nik, nama, cabang, password, roleApp, 'AKTIF', new Date()];
+  if (targetRow > 0) {
+    sh.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    sh.appendRow(rowValues);
+  }
+
+  return { ok: true, message: 'User ID berhasil disimpan.', roleApp: roleApp };
+}
+
+function deriveRoleFromJabatan(jabatan) {
+  var j = String(jabatan || '').toUpperCase();
+  if (j.indexOf('HEAD') !== -1) return 'HEAD';
+  if (j.indexOf('BRANCH MANAGER') !== -1) return 'BM';
+  if (j.indexOf('SUPERVISOR') !== -1) return 'SUPERVISOR';
+  return 'STAFF';
+}
+
+function resolveAuthRole(rec) {
+  if (rec && rec.roleApp) {
+    var roleApp = String(rec.roleApp || '').toUpperCase();
+    if (roleApp === 'ADMIN') return 'Admin';
+    if (roleApp === 'HEAD') return 'Head';
+    if (roleApp === 'BM') return 'BM';
+    if (roleApp === 'SUPERVISOR') return 'Supervisor';
+    return 'Staff';
+  }
+  return 'Staff';
+}
+
+function buildBranchListsFromDashboardRaw(raw) {
+  var listHome = {};
+  var listPipe = {};
+  var listSales = {};
+
+  (raw.achv || []).forEach(function(r) {
+    var cab = String((r && r[1]) || '').trim();
+    if (cab) listHome[cab] = true;
+  });
+  (raw.pipeline || []).forEach(function(r) {
+    var cab = String((r && r[8]) || '').trim();
+    var sales = String((r && r[6]) || '').trim();
+    if (cab) listPipe[cab] = true;
+    if (sales && sales !== '-') listSales[sales] = true;
+  });
+
+  return {
+    listCHome: Object.keys(listHome).sort(),
+    listCPipe: Object.keys(listPipe).sort(),
+    listS: Object.keys(listSales).sort()
+  };
+}
+
+function filterDashboardByUserScope(raw, authUser) {
+  var role = String((authUser && authUser.role) || '').toUpperCase();
+  var nik = String((authUser && authUser.nik) || '').trim();
+  var cabang = String((authUser && authUser.cabang) || '').trim().toUpperCase();
+
+  if (role === 'ADMIN' || !nik) return raw;
+
+  var directory = getEmployeeDirectoryData();
+  var records = directory.records || [];
+  var byNik = directory.byNik || {};
+  var nikSet = {};
+  nikSet[nik] = true;
+
+  if (role === 'SUPERVISOR' || role === 'HEAD') {
+    records.forEach(function(rec) {
+      var recNik = String(rec.nik || '').trim();
+      var atasanNik = String(rec.nikAtasanLangsung || '').trim();
+      var atasan2Nik = String(rec.nikAtasan2 || '').trim();
+      if (!recNik) return;
+      if (atasanNik === nik || atasan2Nik === nik) nikSet[recNik] = true;
+    });
+  } else if (role === 'BM') {
+    records.forEach(function(rec) {
+      var recNik = String(rec.nik || '').trim();
+      var recCab = String(rec.cabang || '').trim().toUpperCase();
+      if (recNik && recCab && cabang && recCab === cabang) nikSet[recNik] = true;
+    });
+  }
+
+  var nameSet = {};
+  Object.keys(nikSet).forEach(function(n) {
+    var rec = byNik[n];
+    if (!rec) return;
+    var nama = String(rec.nama || '').trim();
+    if (nama) nameSet[nama.toUpperCase()] = true;
+  });
+
+  var filtered = {
+    achv: (raw.achv || []).filter(function(r) {
+      var nama = String((r && r[2]) || '').trim().toUpperCase();
+      return !!nameSet[nama];
+    }),
+    cair: (raw.cair || []).filter(function(r) {
+      var nama = String((r && r[2]) || '').trim().toUpperCase();
+      return !!nameSet[nama];
+    }),
+    pipeline: (raw.pipeline || []).filter(function(r) {
+      var sales = String((r && r[6]) || '').trim().toUpperCase();
+      return !!nameSet[sales];
+    })
+  };
+
+  var lists = buildBranchListsFromDashboardRaw(filtered);
+  return {
+    u: authUser,
+    achv: filtered.achv,
+    cair: filtered.cair,
+    pipeline: filtered.pipeline,
+    listCHome: lists.listCHome,
+    listCPipe: lists.listCPipe,
+    listS: lists.listS
+  };
+}
+
+function hashPasswordSHA256(str) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(str || ''), Utilities.Charset.UTF_8);
+  return bytes.map(function(b) {
+    var v = (b < 0 ? b + 256 : b).toString(16);
+    return v.length === 1 ? '0' + v : v;
+  }).join('');
+}
+
+function verifyPasswordInput(inputPassword, storedPassword) {
+  var input = String(inputPassword || '');
+  var stored = String(storedPassword || '');
+  if (!stored) return false;
+  if (stored === input) return true; // backward compatibility plain
+  var hashedInput = hashPasswordSHA256(input);
+  return stored.toLowerCase() === hashedInput.toLowerCase();
+}
+
+function getAuthUserByNik(nik, password) {
+  var key = String(nik || '').trim();
+  var pass = String(password || '');
+  if (!key || !pass) return { ok: false, message: 'NIK dan Password wajib diisi.' };
+
+  var embedded = getEmbeddedAdminByNik(key);
+  if (embedded && verifyPasswordInput(pass, embedded.password)) {
+    return {
+      ok: true,
+      user: {
+        nik: embedded.nik,
+        nama: embedded.nama,
+        role: 'Admin',
+        cabang: embedded.cabang || 'ALL'
+      }
+    };
+  }
+
+  var ss = getDB();
+  var sh = ss.getSheetByName('User_ID');
+  if (!sh || sh.getLastRow() < 2) return { ok: false, message: 'User belum terdaftar.' };
+  var rows = sh.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    var nikVal = String((rows[i] && rows[i][0]) || '').trim();
+    if (nikVal !== key) continue;
+    var status = String((rows[i] && rows[i][5]) || '').trim().toUpperCase();
+    if (status && status !== 'AKTIF') return { ok: false, message: 'User tidak aktif.' };
+    var storedPassword = String((rows[i] && rows[i][3]) || '');
+    if (!verifyPasswordInput(pass, storedPassword)) return { ok: false, message: 'Password salah.' };
+    var roleApp = String((rows[i] && rows[i][4]) || '');
+    return {
+      ok: true,
+      user: {
+        nik: nikVal,
+        nama: String((rows[i] && rows[i][1]) || '').trim() || nikVal,
+        role: resolveAuthRole({ roleApp: roleApp }),
+        cabang: String((rows[i] && rows[i][2]) || '').trim() || 'ALL'
+      }
+    };
+  }
+
+  return { ok: false, message: 'NIK tidak ditemukan.' };
+}
+
+function loginInternalUser(payload) {
+  payload = payload || {};
+  var nik = String(payload.nik || '').trim();
+  var password = String(payload.password || '');
+  var auth = getAuthUserByNik(nik, password);
+  if (!auth.ok) return auth;
+  return {
+    ok: true,
+    user: auth.user
+  };
+}
+
+function getDashboardDataByAuth(nik, password) {
+  var auth = getAuthUserByNik(nik, password);
+  if (!auth.ok) return { ok: false, message: auth.message || 'Login gagal.' };
+  var base = getDashboardData();
+  var filtered = filterDashboardByUserScope(base, auth.user);
+  return {
+    ok: true,
+    data: filtered,
+    user: auth.user
   };
 }
 

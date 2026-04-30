@@ -1,6 +1,15 @@
 <script>
   let db = { u: {}, achv: [], cair: [], pipeline: [], listCHome: [], listCPipe: [], listS: [] };
   let dbCoaching = { master: [], coaching: [], progress: [] };
+  let dbAdminEmployee = { headers: [], rows: [], total: 0 };
+  let adminUserDirectory = { records: [], byNik: {}, byName: {}, branches: [] };
+  let adminEmployeeLookup = { byNik: {}, byName: {}, branches: [] };
+  let authReference = { employees: [], branches: [] };
+  let adminEmployeeViewRows = [];
+  let adminKaryawanEditMode = 'add';
+  let adminKaryawanOriginalNik = '';
+  const adminEmployeeFilter = { keyword: '', branch: '' };
+  let currentAdminSection = 'karyawan';
   let chartMix = null;
   let pipeFiltered = [];
   let rowLimit = 25;
@@ -20,26 +29,254 @@
   const pageOrder = ['home', 'pipe', 'coaching', 'report', 'admin'];
   const pageIndexMap = { home: 0, pipe: 1, coaching: 2, report: 3, admin: 4 };
   const storageKey = 'cc_modular_no_tele_v1';
+  const authStorageKey = 'cc_internal_auth_v1';
+
+  window.onerror = function(message, source, lineno, colno, error) {
+    hideLoader();
+    try {
+      console.error('GlobalError:', message, source, lineno, colno, error);
+    } catch (e) {}
+    return false;
+  };
+
+  window.onunhandledrejection = function(event) {
+    hideLoader();
+    try {
+      console.error('UnhandledRejection:', event && event.reason ? event.reason : event);
+    } catch (e) {}
+  };
+
+  function safeInitApp() {
+    initApp();
+  }
+
+  function submitLogin() {
+    loginInternal();
+  }
+
+  function submitRegisterFromLogin() {
+    registerInternalFromLogin();
+  }
+
+  function logoutSession() {
+    logoutInternal();
+  }
 
   function initApp() {
-    setDefaultDates();
-    setupSwipeNavigation();
-
-    const stored = sessionStorage.getItem(storageKey);
-    if (stored) {
-      try {
-        db = JSON.parse(stored);
-        renderUI();
+    try {
+      const session = getAuthSession();
+      if (!session || !session.nik) {
+        showLoginScreen();
         hideLoader();
-        fetchCoachingAddon();
-        switchPage('home', true);
         return;
-      } catch (e) {
-        sessionStorage.removeItem(storageKey);
       }
-    }
 
-    fetchDB();
+      setDefaultDates();
+      setupSwipeNavigation();
+
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored) {
+        try {
+          db = JSON.parse(stored);
+          renderUI();
+          hideLoader();
+          fetchCoachingAddon();
+          switchPage('home', true);
+          return;
+        } catch (e) {
+          sessionStorage.removeItem(storageKey);
+        }
+      }
+
+      fetchDB();
+    } catch (e) {
+      hideLoader();
+      Swal.fire('Error', e && e.message ? e.message : 'Terjadi kesalahan saat inisialisasi aplikasi', 'error');
+    }
+  }
+
+  function getAuthSession() {
+    try {
+      const raw = sessionStorage.getItem(authStorageKey);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setAuthSession(userObj) {
+    const payload = {
+      nik: String((userObj && userObj.nik) || '').trim(),
+      nama: String((userObj && userObj.nama) || '').trim(),
+      role: String((userObj && userObj.role) || '').trim(),
+      cabang: String((userObj && userObj.cabang) || '').trim(),
+      loginAt: new Date().toISOString()
+    };
+    sessionStorage.setItem(authStorageKey, JSON.stringify(payload));
+  }
+
+  function clearAuthSession() {
+    sessionStorage.removeItem(authStorageKey);
+  }
+
+  function showLoginScreen() {
+    const login = document.getElementById('login-shell');
+    const app = document.getElementById('app-shell');
+    const nav = document.querySelector('.nav-fix');
+    if (login) login.style.display = 'block';
+    if (app) app.style.display = 'none';
+    if (nav) nav.style.display = 'none';
+    switchAuthMode('login');
+    loadAuthReferenceData();
+  }
+
+  function showAppShell() {
+    const login = document.getElementById('login-shell');
+    const app = document.getElementById('app-shell');
+    const nav = document.querySelector('.nav-fix');
+    if (login) login.style.display = 'none';
+    if (app) app.style.display = 'block';
+    if (nav) nav.style.display = 'flex';
+  }
+
+  function switchAuthMode(mode) {
+    const loginPane = document.querySelector('#login-shell .login-card:not(#register-shell)');
+    const regPane = document.getElementById('register-shell');
+    const isLogin = mode !== 'register';
+    if (loginPane) loginPane.style.display = isLogin ? 'block' : 'none';
+    if (regPane) regPane.classList.toggle('d-none', isLogin);
+  }
+
+  function loadAuthReferenceData() {
+    google.script.run
+      .withSuccessHandler(res => {
+        const payload = res || {};
+        authReference = {
+          employees: Array.isArray(payload.employees) ? payload.employees : [],
+          branches: Array.isArray(payload.branches) ? payload.branches : []
+        };
+        renderAuthReferenceSources();
+      })
+      .withFailureHandler(err => {
+        console.error(err);
+      })
+      .getUserRegistrationReferenceData();
+  }
+
+  function renderAuthReferenceSources() {
+    const nikList = document.getElementById('auth-reg-nik-list');
+    const namaList = document.getElementById('auth-reg-nama-list');
+    const cabSel = document.getElementById('auth-reg-cabang');
+    if (nikList) {
+      nikList.innerHTML = authReference.employees.map(r => `<option value="${escapeHtml(r.nik || '')}"></option>`).join('');
+    }
+    if (namaList) {
+      namaList.innerHTML = authReference.employees.map(r => `<option value="${escapeHtml(r.nama || '')}"></option>`).join('');
+    }
+    if (cabSel) {
+      cabSel.innerHTML = '<option value="">Pilih Cabang</option>';
+      authReference.branches.forEach(cab => cabSel.add(new Option(cab, cab)));
+    }
+  }
+
+  function onAuthRegNikChange() {
+    const nik = getValue('auth-reg-nik');
+    const rec = (authReference.employees || []).find(r => String(r.nik || '').trim() === String(nik || '').trim());
+    if (!rec) return;
+    setValue('auth-reg-nama', rec.nama || '');
+    setValue('auth-reg-jabatan', rec.jabatan || '');
+    setValue('auth-reg-cabang', rec.cabang || '');
+  }
+
+  // Compatibility with inline handlers in Index.html
+  function onAuthRegisterNikChange() {
+    onAuthRegNikChange();
+  }
+
+  function onAuthRegNamaChange() {
+    const nama = String(getValue('auth-reg-nama') || '').trim().toUpperCase();
+    const rec = (authReference.employees || []).find(r => String(r.nama || '').trim().toUpperCase() === nama);
+    if (!rec) return;
+    setValue('auth-reg-nik', rec.nik || '');
+    setValue('auth-reg-jabatan', rec.jabatan || '');
+    setValue('auth-reg-cabang', rec.cabang || '');
+  }
+
+  function onAuthRegisterNamaChange() {
+    onAuthRegNamaChange();
+  }
+
+  function loginInternal() {
+    const nik = getValue('login-nik');
+    const password = getValue('login-password');
+    if (!nik || !password) {
+      Swal.fire('Validasi', 'NIK dan Password wajib diisi.', 'warning');
+      return;
+    }
+    Swal.fire({ title: 'Memproses login...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    const timeoutGuard = setTimeout(() => {
+      Swal.close();
+      Swal.fire('Timeout', 'Permintaan login terlalu lama. Coba lagi.', 'warning');
+    }, 15000);
+    google.script.run
+      .withSuccessHandler(res => {
+        clearTimeout(timeoutGuard);
+        Swal.close();
+        const out = res || {};
+        if (!out.ok) {
+          Swal.fire('Login gagal', out.message || 'NIK/password tidak valid', 'error');
+          return;
+        }
+        setAuthSession(out.user || {});
+        showAppShell();
+        sessionStorage.removeItem(storageKey);
+        initApp();
+      })
+      .withFailureHandler(err => {
+        clearTimeout(timeoutGuard);
+        Swal.close();
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal login', 'error');
+      })
+      .getDashboardDataByAuth(nik, password);
+  }
+
+  function registerInternalFromLogin() {
+    const payload = {
+      nik: getValue('auth-reg-nik'),
+      nama: getValue('auth-reg-nama'),
+      jabatan: getValue('auth-reg-jabatan'),
+      cabang: getValue('auth-reg-cabang'),
+      password: getValue('auth-reg-password'),
+      rePassword: getValue('auth-reg-repassword')
+    };
+    if (!payload.nik || !payload.nama || !payload.jabatan || !payload.cabang || !payload.password || !payload.rePassword) {
+      Swal.fire('Validasi', 'Semua field wajib diisi.', 'warning');
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(res => {
+        const out = res || {};
+        if (!out.ok) {
+          Swal.fire('Gagal', out.message || 'Pendaftaran gagal', 'error');
+          return;
+        }
+        Swal.fire('Sukses', out.message || 'Pendaftaran berhasil', 'success');
+        switchAuthMode('login');
+        setValue('login-nik', payload.nik);
+        setValue('login-password', '');
+      })
+      .withFailureHandler(err => {
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal mendaftar', 'error');
+      })
+      .registerUserId(payload);
+  }
+
+  function logoutInternal() {
+    clearAuthSession();
+    sessionStorage.removeItem(storageKey);
+    showLoginScreen();
+    setValue('login-password', '');
   }
 
   function setDefaultDates() {
@@ -71,12 +308,17 @@
   function fetchDB() {
     google.script.run
       .withSuccessHandler(res => {
-        db = res || db;
-        sessionStorage.setItem(storageKey, JSON.stringify(db));
-        renderUI();
-        hideLoader();
-        fetchCoachingAddon();
-        switchPage(currentPage, true);
+        try {
+          db = res || db;
+          sessionStorage.setItem(storageKey, JSON.stringify(db));
+          renderUI();
+          hideLoader();
+          fetchCoachingAddon();
+          switchPage(currentPage, true);
+        } catch (e) {
+          hideLoader();
+          Swal.fire('Error', e && e.message ? e.message : 'Gagal menampilkan data dashboard', 'error');
+        }
       })
       .withFailureHandler(err => {
         hideLoader();
@@ -550,6 +792,9 @@
     currentPage = pageIndexMap[page] === undefined ? 'home' : page;
     updatePageTransform(forceMove);
     updateActiveNavigation(currentPage);
+    if (currentPage === 'admin') {
+      switchAdminSection(currentAdminSection || 'karyawan');
+    }
   }
 
   function updatePageTransform() {
@@ -575,6 +820,7 @@
     const navMap = {
       home: 'n-home',
       pipe: 'n-pipe',
+      report: 'n-report',
       coaching: 'n-coaching',
       admin: 'n-admin'
     };
@@ -592,6 +838,7 @@
     const quickMap = {
       home: '.quick-home',
       pipe: '.quick-pipe',
+      report: '.quick-report',
       coaching: '.quick-coaching',
       admin: '.quick-admin'
     };
@@ -676,6 +923,464 @@
     };
 
     reader.readAsArrayBuffer(file);
+  }
+
+  function switchAdminSection(section) {
+    currentAdminSection = section || 'karyawan';
+    const sections = ['karyawan', 'users', 'upload'];
+    sections.forEach(key => {
+      const secEl = document.getElementById(`admin-section-${key}`);
+      const tabEl = document.getElementById(`admin-tab-${key}`);
+      const active = key === currentAdminSection;
+      if (secEl) secEl.classList.toggle('active', active);
+      if (tabEl) tabEl.classList.toggle('active', active);
+    });
+    if (currentAdminSection === 'karyawan' && (!dbAdminEmployee.rows || !dbAdminEmployee.rows.length)) {
+      loadAdminKaryawan();
+    }
+    if (currentAdminSection === 'users' && (!adminUserDirectory.records || !adminUserDirectory.records.length)) {
+      loadUserRegistrationReference();
+    }
+  }
+
+  function loadAdminKaryawan() {
+    const body = document.getElementById('admin-karyawan-body');
+    if (body) body.innerHTML = "<tr><td colspan='15' class='empty-state'>Memuat data karyawan...</td></tr>";
+    google.script.run
+      .withSuccessHandler(res => {
+        const payload = res || {};
+        const headers = Array.isArray(payload.headers) ? payload.headers : [];
+        const rows = Array.isArray(payload.rows) ? payload.rows : [];
+        dbAdminEmployee = { headers, rows, summary: payload.summary || {}, idxMap: payload.indexMap || payload.idxMap || {} };
+        prepareAdminEmployeeEditorSources(rows);
+        renderAdminKaryawanTable();
+      })
+      .withFailureHandler(err => {
+        if (body) body.innerHTML = "<tr><td colspan='15' class='empty-state'>Gagal memuat data karyawan.</td></tr>";
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal memuat data karyawan', 'error');
+      })
+      .getAdminEmployeeData();
+  }
+
+  function prepareAdminEmployeeEditorSources(rows) {
+    const byNik = {};
+    const byName = {};
+    const branchSet = {};
+    (rows || []).forEach(rec => {
+      const nik = String((rec && rec.nik) || '').trim();
+      const nama = String((rec && rec.nama) || '').trim();
+      const cab = String((rec && rec.cabang) || '').trim();
+      if (nik && !byNik[nik]) byNik[nik] = rec;
+      if (nama) byName[nama.toUpperCase()] = rec;
+      if (cab) branchSet[cab.toUpperCase()] = cab;
+    });
+    adminEmployeeLookup = {
+      byNik,
+      byName,
+      branches: Object.keys(branchSet).sort().map(k => branchSet[k])
+    };
+
+    const nikList = document.getElementById('adm-form-nik-list');
+    const namaList = document.getElementById('adm-form-nama-list');
+    const cabangList = document.getElementById('adm-form-cabang-list');
+    if (nikList) {
+      nikList.innerHTML = Object.keys(byNik).sort().map(nik => `<option value="${escapeHtml(nik)}"></option>`).join('');
+    }
+    if (namaList) {
+      namaList.innerHTML = Object.keys(byName).sort().map(name => `<option value="${escapeHtml(byName[name].nama || '')}"></option>`).join('');
+    }
+    if (cabangList) {
+      cabangList.innerHTML = (adminEmployeeLookup.branches || []).map(cab => `<option value="${escapeHtml(cab)}"></option>`).join('');
+    }
+  }
+
+  function renderAdminKaryawanTable() {
+    const body = document.getElementById('admin-karyawan-body');
+    if (!body) return;
+    const keywordEl = document.getElementById('admin-karyawan-search');
+    const keyword = String((keywordEl && keywordEl.value) || '').trim().toLowerCase();
+    adminEmployeeFilter.keyword = keyword;
+
+    const idx = getAdminEmployeeIndexMap();
+    const rows = dbAdminEmployee.rows || [];
+    const filtered = rows.filter(r => {
+      if (!keyword) return true;
+      const cells = [
+        r.timestamp || '',
+        r.nik || '',
+        r.nama || '',
+        r.cabang || '',
+        r.jabatan || '',
+        r.divisi || '',
+        r.roleUser || '',
+        r.nikAtasan || '',
+        r.namaAtasan || '',
+        r.nikAtasan2 || '',
+        r.namaAtasan2 || '',
+        r.email || '',
+        r.wa || '',
+        r.statusKaryawan || ''
+      ].map(v => String(v || '').toLowerCase());
+      return cells.some(v => v.includes(keyword));
+    });
+    adminEmployeeViewRows = filtered;
+
+    updateAdminSummaryCounts(filtered);
+
+    if (!filtered.length) {
+      body.innerHTML = "<tr><td colspan='15' class='empty-state'>Data tidak ditemukan.</td></tr>";
+      return;
+    }
+
+    body.innerHTML = filtered.slice(0, 1000).map(r => `
+      <tr ondblclick='openAdminEmployeeEditByNik(${toJsString(r.nik || "")})' title="Double klik untuk edit data">
+        <td>${escapeHtml(formatAdminTimestamp(r.timestamp))}</td>
+        <td>${escapeHtml(r.nik || '-')}</td>
+        <td class="fw-semibold">${escapeHtml(r.nama || '-')}</td>
+        <td>${escapeHtml(r.jabatan || '-')}</td>
+        <td>${escapeHtml(r.divisi || '-')}</td>
+        <td>${escapeHtml(r.cabang || '-')}</td>
+        <td>${escapeHtml(r.roleUser || '-')}</td>
+        <td>${escapeHtml(r.nikAtasan || '-')}</td>
+        <td>${escapeHtml(r.namaAtasan || '-')}</td>
+        <td>${escapeHtml(r.nikAtasan2 || '-')}</td>
+        <td>${escapeHtml(r.namaAtasan2 || '-')}</td>
+        <td>${escapeHtml(r.email || '-')}</td>
+        <td>${escapeHtml(r.wa || '-')}</td>
+        <td><span class="badge-status ${String(r.statusKaryawan || '').toUpperCase().includes('AKTIF') ? 'st-app' : 'st-rej'}">${escapeHtml(r.statusKaryawan || '-')}</span></td>
+        <td>
+          <button type="button" class="btn btn-sm btn-outline-primary admin-karyawan-action-btn" onclick='openAdminEmployeeEditByNik(${toJsString(r.nik || "")})'>
+            <i class="bi bi-pencil-square"></i>
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openAdminEmployeeCreate() {
+    adminKaryawanEditMode = 'add';
+    adminKaryawanOriginalNik = '';
+    setText('admin-karyawan-editor-title', 'Tambah Data Karyawan');
+    setText('admin-karyawan-editor-mode', 'MODE TAMBAH');
+    ['adm-form-nik', 'adm-form-nama', 'adm-form-jabatan', 'adm-form-divisi', 'adm-form-cabang', 'adm-form-role-user', 'adm-form-nik-atasan', 'adm-form-nama-atasan', 'adm-form-nik-atasan2', 'adm-form-nama-atasan2', 'adm-form-email', 'adm-form-wa']
+      .forEach(id => setValue(id, ''));
+    setValue('adm-form-status', 'AKTIF');
+    const editor = document.getElementById('admin-karyawan-editor');
+    if (editor) editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function openAdminEmployeeEditByNik(nik) {
+    const key = String(nik || '').trim();
+    if (!key) return;
+    const rec = (dbAdminEmployee.rows || []).find(r => String((r && r.nik) || '').trim() === key);
+    if (!rec) return;
+    adminKaryawanEditMode = 'edit';
+    adminKaryawanOriginalNik = key;
+    setText('admin-karyawan-editor-title', 'Edit Data Karyawan');
+    setText('admin-karyawan-editor-mode', 'MODE EDIT');
+    setValue('adm-form-nik', rec.nik || '');
+    setValue('adm-form-nama', rec.nama || '');
+    setValue('adm-form-jabatan', rec.jabatan || '');
+    setValue('adm-form-divisi', rec.divisi || '');
+    setValue('adm-form-cabang', rec.cabang || '');
+    setValue('adm-form-role-user', rec.roleUser || '');
+    setValue('adm-form-nik-atasan', rec.nikAtasan || '');
+    setValue('adm-form-nama-atasan', rec.namaAtasan || '');
+    setValue('adm-form-nik-atasan2', rec.nikAtasan2 || '');
+    setValue('adm-form-nama-atasan2', rec.namaAtasan2 || '');
+    setValue('adm-form-email', rec.email || '');
+    setValue('adm-form-wa', rec.wa || '');
+    setValue('adm-form-status', rec.statusKaryawan || 'AKTIF');
+    const editor = document.getElementById('admin-karyawan-editor');
+    if (editor) editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function saveAdminEmployeeFromForm() {
+    const payload = {
+      originalNik: adminKaryawanOriginalNik || '',
+      nik: getValue('adm-form-nik'),
+      nama: getValue('adm-form-nama'),
+      jabatan: getValue('adm-form-jabatan'),
+      divisi: getValue('adm-form-divisi'),
+      cabang: getValue('adm-form-cabang'),
+      roleUser: getValue('adm-form-role-user'),
+      nikAtasan: getValue('adm-form-nik-atasan'),
+      namaAtasan: getValue('adm-form-nama-atasan'),
+      nikAtasan2: getValue('adm-form-nik-atasan2'),
+      namaAtasan2: getValue('adm-form-nama-atasan2'),
+      email: getValue('adm-form-email'),
+      wa: getValue('adm-form-wa'),
+      statusKaryawan: getValue('adm-form-status')
+    };
+
+    if (!payload.nik || !payload.nama) {
+      Swal.fire('Validasi', 'NIK dan Nama Karyawan wajib diisi.', 'warning');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(res => {
+        const out = res || {};
+        if (!out.ok) {
+          Swal.fire('Gagal', out.message || 'Simpan data gagal', 'error');
+          return;
+        }
+        Swal.fire('Sukses', out.message || 'Data karyawan berhasil disimpan', 'success');
+        loadAdminKaryawan();
+        openAdminEmployeeCreate();
+      })
+      .withFailureHandler(err => {
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal menyimpan data karyawan', 'error');
+      })
+      .saveAdminEmployee(payload);
+  }
+
+  function deleteAdminEmployeeFromForm() {
+    const nik = getValue('adm-form-nik');
+    if (!nik) {
+      Swal.fire('Validasi', 'Isi NIK yang akan dihapus.', 'warning');
+      return;
+    }
+    Swal.fire({
+      title: 'Pilih aksi penghapusan',
+      text: `NIK ${nik}: pilih Soft Delete atau Hapus Permanen.`,
+      icon: 'question',
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: 'Soft Delete',
+      denyButtonText: 'Hapus Permanen',
+      cancelButtonText: 'Batal'
+    }).then(result => {
+      if (!result.isConfirmed && !result.isDenied) return;
+      const mode = result.isConfirmed ? 'soft' : 'hard';
+      if (mode === 'soft') {
+        google.script.run
+          .withSuccessHandler(res => {
+            const out = res || {};
+            if (!out.ok) {
+              Swal.fire('Gagal', out.message || 'Soft delete gagal', 'error');
+              return;
+            }
+            Swal.fire('Sukses', out.message || 'Karyawan dinonaktifkan', 'success');
+            loadAdminKaryawan();
+            openAdminEmployeeCreate();
+          })
+          .withFailureHandler(err => {
+            Swal.fire('Error', err && err.message ? err.message : 'Gagal melakukan soft delete', 'error');
+          })
+          .deactivateAdminEmployeeByNik(nik);
+        return;
+      }
+
+      Swal.fire({
+        title: 'PIN Admin dibutuhkan',
+        input: 'password',
+        inputLabel: 'Masukkan PIN Admin untuk Hapus Permanen',
+        inputPlaceholder: 'PIN Admin',
+        showCancelButton: true,
+        confirmButtonText: 'Verifikasi & Hapus',
+        cancelButtonText: 'Batal',
+        inputValidator: (value) => {
+          if (!value) return 'PIN wajib diisi.';
+          return undefined;
+        }
+      }).then(pinResult => {
+        if (!pinResult.isConfirmed) return;
+        const pin = String(pinResult.value || '');
+        google.script.run
+          .withSuccessHandler(res => {
+            const out = res || {};
+            if (!out.ok) {
+              Swal.fire('Akses Ditolak', out.message || 'PIN Admin tidak valid.', 'error');
+              return;
+            }
+            Swal.fire('Sukses', out.message || 'Data karyawan dihapus permanen', 'success');
+            loadAdminKaryawan();
+            openAdminEmployeeCreate();
+          })
+          .withFailureHandler(err => {
+            Swal.fire('Error', err && err.message ? err.message : 'Gagal menghapus permanen', 'error');
+          })
+          .deleteAdminEmployeeByNikSecure(nik, pin);
+      });
+    });
+  }
+
+  function resetAdminEmployeeForm() {
+    openAdminEmployeeCreate();
+  }
+
+  function onAdminAtasanNikChange(level) {
+    const lv = Number(level) === 2 ? 2 : 1;
+    const nikId = lv === 2 ? 'adm-form-nik-atasan2' : 'adm-form-nik-atasan';
+    const namaId = lv === 2 ? 'adm-form-nama-atasan2' : 'adm-form-nama-atasan';
+    const nikVal = String(getValue(nikId) || '').trim();
+    const rec = adminEmployeeLookup.byNik ? adminEmployeeLookup.byNik[nikVal] : null;
+    if (!rec) return;
+    setValue(namaId, rec.nama || '');
+  }
+
+  function onAdminAtasanNamaChange(level) {
+    const lv = Number(level) === 2 ? 2 : 1;
+    const nikId = lv === 2 ? 'adm-form-nik-atasan2' : 'adm-form-nik-atasan';
+    const namaId = lv === 2 ? 'adm-form-nama-atasan2' : 'adm-form-nama-atasan';
+    const namaVal = String(getValue(namaId) || '').trim().toUpperCase();
+    const rec = adminEmployeeLookup.byName ? adminEmployeeLookup.byName[namaVal] : null;
+    if (!rec) return;
+    setValue(nikId, rec.nik || '');
+  }
+
+  function formatInputDate(value) {
+    if (!value) return '';
+    const d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function formatAdminTimestamp(value) {
+    if (!value) return '-';
+    const d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleDateString('id-ID');
+  }
+
+  function getAdminEmployeeIndexMap() {
+    return dbAdminEmployee.idxMap || {};
+  }
+
+  function updateAdminSummaryCounts(rows) {
+    const totalEl = document.getElementById('admin-karyawan-total');
+    const cabangEl = document.getElementById('admin-karyawan-cabang');
+    const activeEl = document.getElementById('admin-karyawan-aktif');
+    const nonActiveEl = document.getElementById('admin-karyawan-nonaktif');
+    if (totalEl) totalEl.textContent = String((rows || []).length);
+    const uniq = {};
+    let activeCount = 0;
+    let nonActiveCount = 0;
+    (rows || []).forEach(r => {
+      const cab = String((r && r.cabang) || '').trim().toUpperCase();
+      if (cab) uniq[cab] = true;
+      const st = String((r && r.statusKaryawan) || '').trim().toUpperCase();
+      if (st === 'AKTIF' || st === 'ACTIVE') activeCount++;
+      else if (st) nonActiveCount++;
+    });
+    if (cabangEl) cabangEl.textContent = String(Object.keys(uniq).length);
+    if (activeEl) activeEl.textContent = String(activeCount);
+    if (nonActiveEl) nonActiveEl.textContent = String(nonActiveCount);
+  }
+
+  function loadUserRegistrationReference() {
+    google.script.run
+      .withSuccessHandler(res => {
+        const payload = res || {};
+        const employees = Array.isArray(payload.employees) ? payload.employees : [];
+        const branches = Array.isArray(payload.branches) ? payload.branches : [];
+        const byNik = {};
+        const byName = {};
+        employees.forEach(rec => {
+          const nik = String((rec && rec.nik) || '').trim();
+          const nama = String((rec && rec.nama) || '').trim();
+          if (!nik || !nama) return;
+          byNik[nik] = rec;
+          byName[nama.toUpperCase()] = rec;
+        });
+        adminUserDirectory = { records: employees, byNik, byName, branches };
+        renderUserRegistrationSources();
+      })
+      .withFailureHandler(err => {
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal memuat referensi pendaftaran user', 'error');
+      })
+      .getUserRegistrationReferenceData();
+  }
+
+  function renderUserRegistrationSources() {
+    const nikList = document.getElementById('reg-nik-list');
+    const namaList = document.getElementById('reg-nama-list');
+    const cabangSelect = document.getElementById('reg-cabang');
+    if (nikList) {
+      nikList.innerHTML = (adminUserDirectory.records || [])
+        .map(r => `<option value="${escapeHtml(r.nik || '')}"></option>`)
+        .join('');
+    }
+    if (namaList) {
+      namaList.innerHTML = (adminUserDirectory.records || [])
+        .map(r => `<option value="${escapeHtml(r.nama || '')}"></option>`)
+        .join('');
+    }
+    if (cabangSelect) {
+      cabangSelect.innerHTML = '<option value="">Pilih Cabang</option>';
+      (adminUserDirectory.branches || []).forEach(cab => {
+        const value = String(cab || '').trim();
+        if (!value) return;
+        cabangSelect.add(new Option(value, value));
+      });
+    }
+  }
+
+  function onRegisterNikChange() {
+    const nikEl = document.getElementById('reg-nik');
+    const namaEl = document.getElementById('reg-nama');
+    const jabEl = document.getElementById('reg-jabatan');
+    const cabEl = document.getElementById('reg-cabang');
+    const nik = String((nikEl && nikEl.value) || '').trim();
+    const rec = adminUserDirectory.byNik ? adminUserDirectory.byNik[nik] : null;
+    if (!rec) return;
+    if (namaEl) namaEl.value = rec.nama || '';
+    if (jabEl) jabEl.value = rec.jabatan || '';
+    if (cabEl) cabEl.value = rec.cabang || '';
+  }
+
+  function onRegisterNamaChange() {
+    const nikEl = document.getElementById('reg-nik');
+    const namaEl = document.getElementById('reg-nama');
+    const jabEl = document.getElementById('reg-jabatan');
+    const cabEl = document.getElementById('reg-cabang');
+    const nama = String((namaEl && namaEl.value) || '').trim().toUpperCase();
+    const rec = adminUserDirectory.byName ? adminUserDirectory.byName[nama] : null;
+    if (!rec) return;
+    if (nikEl) nikEl.value = rec.nik || '';
+    if (jabEl) jabEl.value = rec.jabatan || '';
+    if (cabEl) cabEl.value = rec.cabang || '';
+  }
+
+  function registerNewUserId() {
+    const nik = getValue('reg-nik');
+    const nama = getValue('reg-nama');
+    const jabatan = getValue('reg-jabatan');
+    const cabang = getValue('reg-cabang');
+    const password = getValue('reg-password');
+    const rePassword = getValue('reg-repassword');
+
+    if (!nik || !nama || !jabatan || !cabang || !password || !rePassword) {
+      Swal.fire('Validasi', 'Semua field wajib diisi.', 'warning');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(res => {
+        const out = res || {};
+        if (!out.ok) {
+          Swal.fire('Gagal', out.message || 'Pendaftaran user gagal', 'error');
+          return;
+        }
+        Swal.fire('Sukses', `${out.message || 'User tersimpan'}\nRole: ${out.roleApp || '-'}`, 'success');
+        setValue('reg-password', '');
+        setValue('reg-repassword', '');
+      })
+      .withFailureHandler(err => {
+        Swal.fire('Error', err && err.message ? err.message : 'Gagal menyimpan user', 'error');
+      })
+      .registerUserId({
+        nik,
+        nama,
+        jabatan,
+        cabang,
+        password,
+        rePassword
+      });
   }
 
   function fetchCoachingAddon() {
@@ -765,12 +1470,13 @@
   function buildCoachingRows() {
     const master = dbCoaching.master || [];
     const headers = master[0] || [];
-    const idxNik = getHeaderIndex(headers, ['nik'], 1);
+    const idxNik = getHeaderIndex(headers, ['nik', 'npk'], 1);
     const idxNama = getHeaderIndex(headers, ['nama karyawan', 'nama'], 2);
     const idxJab = getHeaderIndex(headers, ['jabatan'], 3);
     const idxRegion = getHeaderIndex(headers, ['region', 'divisi', 'departemen'], 4);
     const idxCab = getHeaderIndex(headers, ['cabang', 'lokasi'], 5);
     const idxRole = getHeaderIndex(headers, ['role user', 'role'], 6);
+    const idxStatusKaryawan = getHeaderIndex(headers, ['status karyawan', 'status'], 13);
 
     const rows = [];
     master.slice(1).forEach(m => {
@@ -796,6 +1502,9 @@
         String(m[idxCab] || '').trim()
       );
 
+      const normalizedStatusKaryawan = normalizeEmployeeStatus(m[idxStatusKaryawan]);
+      if (normalizedStatusKaryawan === 'TIDAK AKTIF') return;
+
       rows.push({
         nik: String(m[idxNik] || '').trim(),
         nama,
@@ -804,6 +1513,7 @@
         cab: normalized.cab,
         bm: resolveBmByBranch(normalized.cab, ''),
         role: String(m[idxRole] || '').trim(),
+        statusKaryawan: normalizedStatusKaryawan,
         status,
         lastId: latest ? String(latest[0] || '') : '',
         lastDate: latest ? formatDisplayDate(latest[1]) : '-',
@@ -813,6 +1523,13 @@
     });
 
     return rows;
+  }
+
+  function normalizeEmployeeStatus(value) {
+    const status = String(value || '').trim().toUpperCase();
+    if (!status) return '';
+    if (status === 'AKTIF' || status === 'ACTIVE') return 'AKTIF';
+    return 'TIDAK AKTIF';
   }
 
   function isLikelyRegionLabel(value) {
