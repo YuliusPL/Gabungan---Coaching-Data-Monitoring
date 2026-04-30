@@ -25,8 +25,47 @@ function getUserData() {
     var email = Session.getActiveUser().getEmail().toLowerCase();
     var ss = getDB();
     var sh = ss.getSheetByName('User_ID');
+    var shEmp = ss.getSheetByName('DB_Karyawan') || ss.getSheetByName('Master_Karyawan');
     var data = sh ? sh.getDataRange().getValues() : [];
-    if (email.includes("yulius") || email === "") return { email: email, nama: "YULIUS PUJI LAKSONO", role: "Admin", cabang: "ALL" };
+    var devAdminNik = '2510285';
+    if (email.includes("yulius")) return { email: email, nama: "YULIUS PUJI LAKSONO", role: "Admin", cabang: "ALL", nik: devAdminNik };
+
+    // Development override: NIK tertentu diperlakukan sebagai Admin
+    // berdasarkan mapping email di DB_Karyawan. Jika Apps Script tidak
+    // memberikan email aktif (kosong), tetap izinkan mode dev.
+    if (shEmp && shEmp.getLastRow() > 1) {
+      var empRows = shEmp.getDataRange().getValues();
+      var hdr = empRows[0] || [];
+      var idxNik = -1, idxNama = -1, idxCab = -1, idxEmail = -1;
+      for (var c = 0; c < hdr.length; c++) {
+        var lab = String(hdr[c] || '').toLowerCase();
+        if (idxNik < 0 && (lab.indexOf('nik') !== -1 || lab.indexOf('npk') !== -1)) idxNik = c;
+        if (idxNama < 0 && lab.indexOf('nama') !== -1) idxNama = c;
+        if (idxCab < 0 && (lab.indexOf('cabang') !== -1 || lab.indexOf('branch') !== -1)) idxCab = c;
+        if (idxEmail < 0 && lab.indexOf('email') !== -1) idxEmail = c;
+      }
+      if (idxNik < 0) idxNik = 1;
+      if (idxNama < 0) idxNama = 2;
+      if (idxCab < 0) idxCab = 5;
+      if (idxEmail < 0) idxEmail = 11;
+
+      for (var r = 1; r < empRows.length; r++) {
+        var nik = String((empRows[r] && empRows[r][idxNik]) || '').trim();
+        if (nik !== devAdminNik) continue;
+        var empEmail = String((empRows[r] && empRows[r][idxEmail]) || '').trim().toLowerCase();
+        if (email === '' || (empEmail && email === empEmail)) {
+          return {
+            email: email || empEmail,
+            nama: String((empRows[r] && empRows[r][idxNama]) || 'ADMIN DEV').trim() || 'ADMIN DEV',
+            role: 'Admin',
+            cabang: String((empRows[r] && empRows[r][idxCab]) || 'ALL').trim() || 'ALL',
+            nik: devAdminNik
+          };
+        }
+      }
+    }
+
+    if (email === "") return { email: email, nama: "ADMIN", role: "Admin", cabang: "ALL" };
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] && data[i][0].toLowerCase() === email) return { email: data[i][0], nama: data[i][1], role: data[i][3], cabang: data[i][4] };
     }
