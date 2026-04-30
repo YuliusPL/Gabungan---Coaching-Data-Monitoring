@@ -5,6 +5,24 @@
 
 var DB_ID = '1fKi00TOdtqwlyP6Uk20sGbJHrm_dsQ5frlkFm6jMAzE';
 
+// Embedded admin users (development bootstrap)
+// NIK | Nama | Cabang | Password | Role_App | Status_User
+var EMBEDDED_ADMIN_USERS = {
+  '2510285': { nik: '2510285', nama: 'YULIUS PUJI LAKSONO', cabang: 'LEUWIPANJANG', password: '2510285', roleApp: 'ADMIN', statusUser: 'AKTIF' },
+  '1234567': { nik: '1234567', nama: 'ADMIN1', cabang: 'LEUWIPANJANG', password: '1234567', roleApp: 'ADMIN', statusUser: 'AKTIF' },
+  '1111111': { nik: '1111111', nama: 'ADMIN2', cabang: 'LEUWIPANJANG', password: '1111111', roleApp: 'ADMIN', statusUser: 'AKTIF' },
+  '9999999': { nik: '9999999', nama: 'ADMIN3', cabang: 'LEUWIPANJANG', password: '9999999', roleApp: 'ADMIN', statusUser: 'AKTIF' }
+};
+
+function getEmbeddedAdminByNik(nik) {
+  var key = String(nik || '').trim();
+  if (!key) return null;
+  var rec = EMBEDDED_ADMIN_USERS[key];
+  if (!rec) return null;
+  if (String(rec.statusUser || '').toUpperCase() !== 'AKTIF') return null;
+  return rec;
+}
+
 function getDB() {
   return SpreadsheetApp.openById(DB_ID);
 }
@@ -51,15 +69,20 @@ function getUserData() {
 
       for (var r = 1; r < empRows.length; r++) {
         var nik = String((empRows[r] && empRows[r][idxNik]) || '').trim();
-        if (nik !== devAdminNik) continue;
         var empEmail = String((empRows[r] && empRows[r][idxEmail]) || '').trim().toLowerCase();
+        var embeddedAdmin = getEmbeddedAdminByNik(nik);
+        if (!embeddedAdmin) {
+          // Backward compatibility for previous single dev override
+          if (nik !== devAdminNik) continue;
+          embeddedAdmin = { nik: nik, nama: String((empRows[r] && empRows[r][idxNama]) || 'ADMIN DEV').trim() || 'ADMIN DEV', cabang: String((empRows[r] && empRows[r][idxCab]) || 'ALL').trim() || 'ALL' };
+        }
         if (email === '' || (empEmail && email === empEmail)) {
           return {
             email: email || empEmail,
-            nama: String((empRows[r] && empRows[r][idxNama]) || 'ADMIN DEV').trim() || 'ADMIN DEV',
+            nama: embeddedAdmin.nama || String((empRows[r] && empRows[r][idxNama]) || 'ADMIN DEV').trim() || 'ADMIN DEV',
             role: 'Admin',
-            cabang: String((empRows[r] && empRows[r][idxCab]) || 'ALL').trim() || 'ALL',
-            nik: devAdminNik
+            cabang: embeddedAdmin.cabang || String((empRows[r] && empRows[r][idxCab]) || 'ALL').trim() || 'ALL',
+            nik: embeddedAdmin.nik || nik
           };
         }
       }
