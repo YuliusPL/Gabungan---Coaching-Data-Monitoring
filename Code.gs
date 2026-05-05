@@ -41,6 +41,57 @@ function isJunkBranch(val) {
   return junk.some(word => v.indexOf(word) > -1);
 }
 
+function parsePlafondRupiahForPipeline(val) {
+  if (val == null || val === "") return 0;
+  if (typeof val === "number" && !isNaN(val)) return Math.round(val);
+  var s = String(val).trim().replace(/\s/g, "");
+  if (!s) return 0;
+  // format 1.234.567,89
+  var decComma = s.match(/^([\d.]+),(\d{1,2})$/);
+  if (decComma) {
+    var intPart = decComma[1].replace(/\./g, "");
+    return Math.round(parseFloat(intPart + "." + decComma[2]));
+  }
+  // format 1.234.567 atau 1234567
+  var noSep = s.replace(/\./g, "").replace(/,/g, "");
+  if (/^\d+$/.test(noSep)) return Math.round(parseInt(noSep, 10));
+  var n = Number(s.replace(/\./g, "").replace(",", "."));
+  return isNaN(n) ? 0 : Math.round(n);
+}
+
+function getRawPipelineColumnMap_(headerRow) {
+  var map = { idxDate: 0, idxRawB: 1, idxDeb: 2, idxCab: 3, idxStat: 4, idxMix: 5, idxKep: 6, idxSal: 7, idxPla: 10, hasHeader: false };
+  if (!headerRow || !headerRow.length) return map;
+  var norm = headerRow.map(function(v) { return String(v || "").toLowerCase().trim(); });
+  function findIdx(cands, fallback) {
+    for (var i = 0; i < norm.length; i++) {
+      var label = norm[i];
+      if (!label) continue;
+      for (var j = 0; j < cands.length; j++) {
+        if (label.indexOf(cands[j]) !== -1) return i;
+      }
+    }
+    return fallback;
+  }
+  var idxDeb = findIdx(["debitur", "nama debitur"], -1);
+  var idxCab = findIdx(["cabang", "branch"], -1);
+  var idxSal = findIdx(["sales", "nama sales", "marketing"], -1);
+  var idxPla = findIdx(["plafond", "plafon", "limit"], -1);
+  if (idxDeb >= 0 || idxCab >= 0 || idxSal >= 0 || idxPla >= 0) {
+    map.hasHeader = true;
+    map.idxDate = findIdx(["tgl", "tanggal", "date"], 0);
+    map.idxRawB = findIdx(["aging", "serial", "msec", "hari"], 1);
+    map.idxDeb = idxDeb >= 0 ? idxDeb : 2;
+    map.idxCab = idxCab >= 0 ? idxCab : 3;
+    map.idxStat = findIdx(["status"], 4);
+    map.idxMix = findIdx(["mix", "produk", "product"], 5);
+    map.idxKep = findIdx(["keputusan", "decision"], 6);
+    map.idxSal = idxSal >= 0 ? idxSal : 7;
+    map.idxPla = idxPla >= 0 ? idxPla : 10;
+  }
+  return map;
+}
+
 function getDashboardData() {
   var cache = CacheService.getScriptCache();
   var cached = cache.get("db_v181_no_tele");
@@ -80,20 +131,31 @@ function getDashboardData() {
     var shP = ss.getSheetByName('Raw_Pipeline');
     if (shP && shP.getLastRow() >= 1) {
       var dataP = shP.getDataRange().getValues();
-      dataP.forEach(r => {
-        if (!r[0] || !r[2] || String(r[2]).toLowerCase().includes("debitur")) return;
-        var rawB = r[1], msec;
+      var colMap = getRawPipelineColumnMap_(dataP[0] || []);
+      var startRow = colMap.hasHeader ? 1 : 0;
+      for (var pr = startRow; pr < dataP.length; pr++) {
+        var r = dataP[pr];
+        var debRaw = r[colMap.idxDeb];
+        if (!r[colMap.idxDate] || !debRaw || String(debRaw).toLowerCase().indexOf("debitur") !== -1) continue;
+        var rawB = r[colMap.idxRawB], msec;
         if (typeof rawB === 'number') msec = (rawB - 25569) * 86400 * 1000;
         else if (rawB instanceof Date) msec = rawB.getTime();
         else msec = new Date().getTime();
-        var tglIn = (r[0] instanceof Date) ? Utilities.formatDate(r[0], "GMT+7", "yyyy-MM-dd") : String(r[0]).substring(0,10);
-        var deb = String(r[2]).trim(); var cab = String(r[3]).trim(); var stat = String(r[4]).trim(); var mix = String(r[5]).trim(); var kep = String(r[6]).trim(); var sal = String(r[7] || "-").trim(); var pla = Number(String(r[10]||"0").replace(/[^0-9.-]+/g,"")) || 0; 
+        var tglRaw = r[colMap.idxDate];
+        var tglIn = (tglRaw instanceof Date) ? Utilities.formatDate(tglRaw, "GMT+7", "yyyy-MM-dd") : String(tglRaw).substring(0,10);
+        var deb = String(r[colMap.idxDeb] || "").trim();
+        var cab = String(r[colMap.idxCab] || "").trim();
+        var stat = String(r[colMap.idxStat] || "").trim();
+        var mix = String(r[colMap.idxMix] || "").trim();
+        var kep = String(r[colMap.idxKep] || "").trim();
+        var sal = String(r[colMap.idxSal] || "-").trim();
+        var pla = parsePlafondRupiahForPipeline(r[colMap.idxPla]);
         if (cab && !isJunkBranch(cab)) {
           if (res.listCPipe.indexOf(cab) === -1) res.listCPipe.push(cab);
           if (sal !== "-" && res.listS.indexOf(sal) === -1) res.listS.push(sal);
         }
         res.pipeline.push([tglIn, msec, deb, stat, mix, kep, sal, pla, cab]);
-      });
+      }
     }
     cache.put("db_v181_no_tele", JSON.stringify(res), 300);
     return res;
@@ -109,12 +171,22 @@ function processExcelData(rows, tgl, tipe) {
     if (!map[tipe]) return "❌ Jenis upload tidak dikenali.";
     var sh = ss.getSheetByName(map[tipe]) || ss.insertSheet(map[tipe]);
     var finalData = [];
+    var pipelineNumericCols = {};
+    if (tipe == "7" && rows && rows.length) {
+      var hdr = rows[0] || [];
+      for (var hc = 0; hc < hdr.length; hc++) {
+        var label = String(hdr[hc] || "").toLowerCase();
+        if (label.indexOf("plafond") !== -1 || label.indexOf("plafon") !== -1 || label.indexOf("limit") !== -1) {
+          pipelineNumericCols[hc] = true;
+        }
+      }
+    }
     var clean = v => { if (!v || v === "-" || v === "" || v === 0) return 0; return parseFloat(v.toString().replace(/\./g, "").replace(/,/g, ".")) || 0; };
     for (var i = 1; i < rows.length; i++) {
       var r = rows[i]; if (!r[0] || r[0] === "CABANG" || r[0] === "TGL") continue;
       var row = [tgl];
       for (var c = 0; c < r.length; c++) { 
-        var isNum = (tipe == "7" && (c == 9 || c == 10)) || (tipe != "7" && c >= 2); 
+        var isNum = (tipe == "7" && ((pipelineNumericCols[c] === true) || (Object.keys(pipelineNumericCols).length === 0 && (c == 9 || c == 10)))) || (tipe != "7" && c >= 2); 
         row.push(isNum ? clean(r[c]) : r[c]); 
       }
       finalData.push(row);
