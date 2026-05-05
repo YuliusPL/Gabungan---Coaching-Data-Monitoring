@@ -377,8 +377,9 @@
   }
 
   /**
-   * Satu baris pipeline masuk tepat satu bucket: Pending, Reject, Belum Cair, Cair, atau Lainnya.
-   * Penjumlahan bucket = APK Masuk (metrics.apk).
+   * Satu baris = tepat satu bucket: Approve, Pending, Reject, atau Cair.
+   * Approve + Pending + Reject + Cair = APK Masuk.
+   * Baris yang sudah CAIR tidak lagi dihitung di Approve walau keputusan berisi APPROVE (hindari double count).
    */
   function pipelineStageFromRow(r) {
     const st = String(r[3] || '').toUpperCase();
@@ -387,32 +388,31 @@
     if (kp.indexOf('REJECT') !== -1 || kp.indexOf('DITOLAK') !== -1) return 'rej';
     if (kp.indexOf('PENDING') !== -1 || st.indexOf('PENDING') !== -1) return 'pen';
 
-    var notYetCair =
+    var belumCairExplicit =
       (st.indexOf('BLM') !== -1 && st.indexOf('CAIR') !== -1) ||
       (st.indexOf('BELUM') !== -1 && st.indexOf('CAIR') !== -1) ||
-      kp.indexOf('BLM CAIR') !== -1 ||
-      kp.indexOf('BLUM CAIR') !== -1 ||
-      kp.indexOf('BELUM CAIR') !== -1 ||
       kp.indexOf('APP BLM') !== -1 ||
+      kp.indexOf('BLM CAIR') !== -1 ||
+      kp.indexOf('BELUM CAIR') !== -1 ||
       (kp.indexOf('APPROVE') !== -1 && (kp.indexOf('BLM') !== -1 || kp.indexOf('BELUM') !== -1));
 
-    if (notYetCair) return 'bel';
+    if (belumCairExplicit) return 'app';
 
-    var looksCair =
+    var sudahCair =
       st === 'CAIR' ||
       (st.indexOf('CAIR') !== -1 && st.indexOf('BLM') === -1 && st.indexOf('BELUM') === -1) ||
       (kp.indexOf('CAIR') !== -1 && kp.indexOf('BLM') === -1 && kp.indexOf('BELUM') === -1);
 
-    if (looksCair) return 'cair';
+    if (sudahCair) return 'cair';
 
-    if (kp.indexOf('APPROVE') !== -1 || st.indexOf('APPROVE') !== -1) return 'bel';
+    if (kp.indexOf('APPROVE') !== -1 || st.indexOf('APPROVE') !== -1) return 'app';
 
-    return 'oth';
+    return 'app';
   }
 
   function calculatePipeline() {
     const rows = pipeFiltered;
-    const metrics = { apk: 0, app: 0, pen: 0, rej: 0, bel: 0, cair: 0, oth: 0, pla: 0, ag: [0, 0, 0, 0] };
+    const metrics = { apk: 0, app: 0, pen: 0, rej: 0, cair: 0, pla: 0, ag: [0, 0, 0, 0] };
     const salesPerf = {};
     const productMix = {};
     const today = new Date().getTime();
@@ -425,14 +425,11 @@
       const kp = String(r[5] || '').toUpperCase();
       const mixVal = String(r[4] || 'LAINNYA').toUpperCase();
 
-      if (kp.includes('APPROVE')) metrics.app++;
-
       const stage = pipelineStageFromRow(r);
       if (stage === 'pen') metrics.pen++;
       else if (stage === 'rej') metrics.rej++;
-      else if (stage === 'bel') metrics.bel++;
       else if (stage === 'cair') metrics.cair++;
-      else metrics.oth++;
+      else metrics.app++;
 
       productMix[mixVal] = (productMix[mixVal] || 0) + 1;
 
@@ -449,15 +446,15 @@
     });
 
     setText('k-pla', 'Rp ' + metrics.pla.toLocaleString('id-ID'));
-    setText('k-conv', (metrics.apk > 0 ? ((metrics.app / metrics.apk) * 100).toFixed(1) : '0.0') + '%');
+    const approvedAll = metrics.app + metrics.cair;
+    setText('k-conv', (metrics.apk > 0 ? ((approvedAll / metrics.apk) * 100).toFixed(1) : '0.0') + '%');
     setText('k-avg', 'Rp ' + (metrics.apk > 0 ? Math.round(metrics.pla / metrics.apk).toLocaleString('id-ID') : '0'));
 
     setText('fn-naik', metrics.apk.toLocaleString('id-ID'));
+    setFunnelValue('fn-app', metrics.app, metrics.apk);
     setFunnelValue('fn-pen', metrics.pen, metrics.apk);
     setFunnelValue('fn-rej', metrics.rej, metrics.apk);
-    setFunnelValue('fn-bel', metrics.bel, metrics.apk);
     setFunnelValue('fn-cair', metrics.cair, metrics.apk);
-    setFunnelValue('fn-oth', metrics.oth, metrics.apk);
     ensurePipelineFunnelStructure();
 
     [1, 2, 3, 4].forEach(i => {
@@ -487,7 +484,7 @@
   }
 
   function ensurePipelineFunnelStructure() {
-    ['fn-pen', 'fn-rej', 'fn-bel', 'fn-cair', 'fn-oth'].forEach(id => {
+    ['fn-app', 'fn-pen', 'fn-rej', 'fn-cair'].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       const countEl = el.querySelector('.funnel-count');

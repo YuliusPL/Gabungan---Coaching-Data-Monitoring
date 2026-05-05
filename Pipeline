@@ -53,6 +53,10 @@
       <h6 class="section-title">Funnel Pipeline</h6>
       <div class="card-mewah funnel-card">
         <div class="funnel-box st-apk"><span>APK Masuk</span><span id="fn-naik">0</span></div>
+        <div class="funnel-box st-app">
+          <span>Approve</span>
+          <span id="fn-app" class="funnel-value"><b class="funnel-count">0</b><small class="funnel-pct">0%</small></span>
+        </div>
         <div class="funnel-box st-pen">
           <span>Pending</span>
           <span id="fn-pen" class="funnel-value"><b class="funnel-count">0</b><small class="funnel-pct">0%</small></span>
@@ -61,17 +65,9 @@
           <span>Reject</span>
           <span id="fn-rej" class="funnel-value"><b class="funnel-count">0</b><small class="funnel-pct">0%</small></span>
         </div>
-        <div class="funnel-box st-bel">
-          <span>Belum Cair</span>
-          <span id="fn-bel" class="funnel-value"><b class="funnel-count">0</b><small class="funnel-pct">0%</small></span>
-        </div>
         <div class="funnel-box st-cair">
           <span>Cair</span>
           <span id="fn-cair" class="funnel-value"><b class="funnel-count">0</b><small class="funnel-pct">0%</small></span>
-        </div>
-        <div class="funnel-box st-oth">
-          <span>Lainnya</span>
-          <span id="fn-oth" class="funnel-value"><b class="funnel-count">0</b><small class="funnel-pct">0%</small></span>
         </div>
       </div>
     </div>
